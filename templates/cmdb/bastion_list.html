@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}跳板机管理 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>🖥️ 跳板机管理</h2>
+        <div class="btn-group">
+            <a href="{% url 'bastion_add' %}" class="btn btn-primary">➕ 添加跳板机</a>
+            <a href="{% url 'collect_task_list' %}" class="btn btn-secondary">← 返回采集任务</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>IP地址</th>
+                    <th>端口</th>
+                    <th>用户名</th>
+                    <th>认证方式</th>
+                    <th>状态</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bastion in bastions %}
+                <tr>
+                    <td><strong>{{ bastion.name }}</strong></td>
+                    <td>{{ bastion.host }}</td>
+                    <td>{{ bastion.port }}</td>
+                    <td>{{ bastion.username }}</td>
+                    <td>
+                        {% if bastion.private_key %}
+                            <span class="badge badge-info">私钥</span>
+                        {% else %}
+                            <span class="badge badge-default">密码</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if bastion.is_enabled %}
+                            <span class="badge badge-success">启用</span>
+                        {% else %}
+                            <span class="badge badge-secondary">禁用</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ bastion.memo|truncatechars:20 }}</td>
+                    <td>
+                        <a href="{% url 'bastion_edit' bastion.id %}" class="btn btn-sm btn-warning">编辑</a>
+                        <a href="{% url 'bastion_delete' bastion.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除该跳板机？')">删除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted">暂无跳板机配置</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

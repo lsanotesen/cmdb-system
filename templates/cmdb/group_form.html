@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'edit' %}编辑资产组{% else %}添加资产组{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'edit' %}✏️ 编辑资产组{% else %}➕ 添加资产组{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'group_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>组名称 *</label>
+                    <input type="text" name="name" class="form-control" required value="{{ group.name|default:'' }}" placeholder="如: Web服务器组">
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <input type="text" name="desc" class="form-control" value="{{ group.description|default:'' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>可用服务器</label>
+                    <select id="available-servers" class="form-control" multiple="multiple" style="height: 300px;">
+                        {% for host in available_hosts %}
+                        <option value="{{ host.id }}">{{ host.hostname }} ({{ host.ip }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 0 0 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px;">
+                    <button type="button" class="btn btn-success" onclick="moveSelected('available-servers', 'selected-servers')">→</button>
+                    <button type="button" class="btn btn-danger" onclick="moveSelected('selected-servers', 'available-servers')">←</button>
+                    <button type="button" class="btn btn-success" onclick="moveAll('available-servers', 'selected-servers')">→→</button>
+                    <button type="button" class="btn btn-danger" onclick="moveAll('selected-servers', 'available-servers')">←←</button>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>已选服务器</label>
+                    <select id="selected-servers" name="servers" class="form-control" multiple="multiple" style="height: 300px;">
+                        {% for host in selected_hosts %}
+                        <option value="{{ host.id }}">{{ host.hostname }} ({{ host.ip }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <script>
+                // 移动选中的服务器
+                function moveSelected(fromId, toId) {
+                    const fromSelect = document.getElementById(fromId);
+                    const toSelect = document.getElementById(toId);
+                    
+                    const selectedOptions = Array.from(fromSelect.selectedOptions);
+                    selectedOptions.forEach(option => {
+                        toSelect.appendChild(option);
+                    });
+                }
+                
+                // 移动所有服务器
+                function moveAll(fromId, toId) {
+                    const fromSelect = document.getElementById(fromId);
+                    const toSelect = document.getElementById(toId);
+                    
+                    while (fromSelect.options.length > 0) {
+                        toSelect.appendChild(fromSelect.options[0]);
+                    }
+                }
+                
+                // 双击添加服务器
+                document.addEventListener('DOMContentLoaded', function() {
+                    // 双击可用服务器添加到已选
+                    const availableSelect = document.getElementById('available-servers');
+                    availableSelect.addEventListener('dblclick', function(e) {
+                        if (e.target.tagName === 'OPTION') {
+                            const toSelect = document.getElementById('selected-servers');
+                            toSelect.appendChild(e.target);
+                        }
+                    });
+                    
+                    // 双击已选服务器移回可用
+                    const selectedSelect = document.getElementById('selected-servers');
+                    selectedSelect.addEventListener('dblclick', function(e) {
+                        if (e.target.tagName === 'OPTION') {
+                            const toSelect = document.getElementById('available-servers');
+                            toSelect.appendChild(e.target);
+                        }
+                    });
+                    
+                    // 表单提交前，选中所有已选服务器
+                    const form = document.querySelector('form');
+                    form.addEventListener('submit', function(e) {
+                        const selectedSelect = document.getElementById('selected-servers');
+                        for (let i = 0; i < selectedSelect.options.length; i++) {
+                            selectedSelect.options[i].selected = true;
+                        }
+                    });
+                });
+            </script>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-success">保存</button>
+                <a href="{% url 'group_list' %}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

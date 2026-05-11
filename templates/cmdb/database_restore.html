@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+
+{% block title %}数据恢复{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 0 auto;">
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🔄 数据库恢复</h2>
+            <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">通过上传SQL文件恢复数据库</p>
+        </div>
+        
+        <div class="card-body" style="padding: 30px;">
+            {% if restore_status %}
+            <div style="padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; {% if restore_status.success %}background: #d4edda; color: #155724;{% else %}background: #f8d7da; color: #721c24;{% endif %}">
+                <strong>{% if restore_status.success %}✓ 成功{% else %}✗ 失败{% endif %}</strong>: {{ restore_status.message }}
+                {% if restore_status.success %}
+                <br><br>
+                <span style="font-size: 13px;">💡 提示：数据已成功恢复，请手动刷新页面或重新登录。</span>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px; color: #856404; font-size: 14px;">⚠️ 重要警告</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 13px; line-height: 1.6;">
+                    <li>恢复操作将<strong>覆盖当前所有数据</strong></li>
+                    <li>请确保已备份当前数据库</li>
+                    <li>恢复过程可能需要几分钟，请耐心等待</li>
+                    <li>只有超级管理员才能执行此操作</li>
+                </ul>
+            </div>
+            
+            <form method="post" enctype="multipart/form-data" style="margin-bottom: 20px;">
+                {% csrf_token %}
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #333;">选择SQL文件</label>
+                    <div id="dropArea" style="border: 2px dashed #ddd; border-radius: 8px; padding: 30px; text-align: center; transition: border-color 0.3s;">
+                        <input type="file" name="sql_file" accept=".sql,.sql.gz" style="display: none;" id="sqlFileInput">
+                        <label for="sqlFileInput" style="cursor: pointer; display: inline-block;">
+                            <div id="fileIcon" style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                            <div id="fileText" style="color: #666;">点击或拖拽文件到此处</div>
+                            <div id="fileName" style="color: #28a745; font-size: 14px; margin-top: 10px; font-weight: 500;"></div>
+                            <div style="color: #999; font-size: 12px; margin-top: 5px;">支持 .sql 或 .sql.gz 文件</div>
+                        </label>
+                    </div>
+                </div>
+                
+                <button type="submit" id="restoreBtn" style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: transform 0.2s; margin-bottom: 10px;" onclick="return confirmRestore()">
+                    🚀 开始恢复
+                </button>
+                
+                <!-- 加载状态 -->
+                <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px; background: #e7f3ff; border-radius: 8px;">
+                    <div style="font-size: 32px; margin-bottom: 10px;">⏳</div>
+                    <div style="color: #007bff; font-weight: 500;">正在恢复数据...</div>
+                    <div style="color: #666; font-size: 13px; margin-top: 5px;">此过程可能需要几分钟，请耐心等待...</div>
+                </div>
+            </form>
+            
+            <div style="text-align: center; color: #999; font-size: 13px;">
+                <p>💡 提示：恢复后系统会自动重新加载页面</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmRestore() {
+    var fileInput = document.getElementById('sqlFileInput');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('请先选择要恢复的SQL文件！');
+        return false;
+    }
+    
+    return confirm(
+        '⚠️ 警告：此操作将覆盖当前数据库中的所有数据！\n\n' +
+        '请确认您已经：\n' +
+        '1. 备份了当前数据库\n' +
+        '2. 确保上传的SQL文件正确\n' +
+        '3. 通知相关人员数据将被恢复\n\n' +
+        '确定要继续恢复吗？'
+    );
+}
+
+// 文件选择显示
+document.getElementById('sqlFileInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (file) {
+        document.getElementById('fileIcon').textContent = '✅';
+        document.getElementById('fileText').textContent = '文件已选择';
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('dropArea').style.borderColor = '#28a745';
+        document.getElementById('dropArea').style.borderStyle = 'solid';
+    }
+});
+
+// 拖拽上传支持
+document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    document.getElementById('dropArea').style.borderColor = '#667eea';
+});
+
+document.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    document.getElementById('dropArea').style.borderColor = '#ddd';
+    document.getElementById('dropArea').style.borderStyle = 'dashed';
+});
+
+document.addEventListener('drop', function(e) {
+    e.preventDefault();
+    document.getElementById('dropArea').style.borderColor = '#ddd';
+    document.getElementById('dropArea').style.borderStyle = 'dashed';
+    var files = e.dataTransfer.files;
+    if (files.length > 0) {
+        document.getElementById('sqlFileInput').files = files;
+        // 触发change事件
+        var event = new Event('change');
+        document.getElementById('sqlFileInput').dispatchEvent(event);
+    }
+});
+
+// 表单提交时显示加载状态
+document.querySelector('form').addEventListener('submit', function(e) {
+    document.getElementById('restoreBtn').style.display = 'none';
+    document.getElementById('loadingIndicator').style.display = 'block';
+});
+</script>
+{% endblock %}

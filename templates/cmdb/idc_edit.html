@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>编辑机房</h2>
+    </div>
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>机房标识 *</label>
+                <input type="text" name="ids" class="form-control" value="{{ idc.ids }}" required>
+            </div>
+            <div class="form-group">
+                <label>机房名称 *</label>
+                <input type="text" name="name" class="form-control" value="{{ idc.name }}" required>
+            </div>
+            <div class="form-group">
+                <label>机房地址</label>
+                <input type="text" name="address" class="form-control" value="{{ idc.address }}">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" name="tel" class="form-control" value="{{ idc.tel }}">
+            </div>
+            <div class="form-group">
+                <label>客户经理</label>
+                <input type="text" name="contact" class="form-control" value="{{ idc.contact }}">
+            </div>
+            <div class="form-group">
+                <label>移动电话</label>
+                <input type="text" name="contact_phone" class="form-control" value="{{ idc.contact_phone }}">
+            </div>
+            <div class="form-group">
+                <label>机柜信息</label>
+                <input type="text" name="jigui" class="form-control" value="{{ idc.jigui }}">
+            </div>
+            <div class="form-group">
+                <label>IP范围</label>
+                <input type="text" name="ip_range" class="form-control" value="{{ idc.ip_range }}">
+            </div>
+            <div class="form-group">
+                <label>接入带宽</label>
+                <input type="text" name="bandwidth" class="form-control" value="{{ idc.bandwidth }}">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3">{{ idc.memo }}</textarea>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-success">保存</button>
+                <a href="{% url 'idc_list' %}" class="btn btn-secondary">返回</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

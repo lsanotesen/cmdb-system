@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}资产详情 - {{ host.hostname }} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>🖥️ 资产详情 - {{ host.hostname }}</h2>
+        <div class="btn-group">
+            <a href="{% url 'asset_edit' host.id %}" class="btn">✏️ 编辑</a>
+            <a href="{% url 'asset_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="detail-grid">
+            <div class="detail-item">
+                <label>主机名</label>
+                <span><strong>{{ host.hostname }}</strong></span>
+            </div>
+            <div class="detail-item">
+                <label>资产编号</label>
+                <span>{{ host.asset_no|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>所在机柜位置</label>
+                <span>{{ host.cabinet_position|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>所属部门/团队</label>
+                <span>{{ host.department|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>设备类型</label>
+                <span>
+                    {% if host.asset_type == '1' %}<span class="badge badge-info">物理机</span>
+                    {% elif host.asset_type == '2' %}<span class="badge badge-default">虚拟机</span>
+                    {% elif host.asset_type == '3' %}<span class="badge badge-warning">容器</span>
+                    {% elif host.asset_type == '4' %}<span class="badge badge-success">网络设备</span>
+                    {% elif host.asset_type == '5' %}<span class="badge badge-danger">安全设备</span>
+                    {% else %}<span class="badge badge-default">其他</span>{% endif %}
+                </span>
+            </div>
+            <div class="detail-item">
+                <label>IP 地址</label>
+                <span><code>{{ host.ip }}</code></span>
+            </div>
+            <div class="detail-item">
+                <label>责任人</label>
+                <span>{{ host.responsible_person|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>设备品牌型号</label>
+                <span>{{ host.device_model|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>CPU 型号</label>
+                <span>{{ host.cpu_model|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>CPU 数量</label>
+                <span>{{ host.cpu_num|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>CPU 核数</label>
+                <span>{{ host.cpu_cores|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>GPU 型号</label>
+                <span>{{ host.gpu_model|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>额定功率 (W)</label>
+                <span>{{ host.power_rating|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>内存</label>
+                <span>{{ host.memory|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>硬盘</label>
+                <span>{{ host.disk|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>操作系统</label>
+                <span>{{ host.os|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>序列号</label>
+                <span><code>{{ host.sn|default:'-' }}</code></span>
+            </div>
+            <div class="detail-item">
+                <label>带外管理 IP</label>
+                <span><code>{{ host.bm_ip|default:'-' }}</code></span>
+            </div>
+            <div class="detail-item">
+                <label>上架时间</label>
+                <span>{{ host.up_time|default:'-' }}</span>
+            </div>
+            <div class="detail-item">
+                <label>设备状态</label>
+                <span>
+                    {% if host.status == '1' %}<span class="badge badge-success">使用中</span>
+                    {% elif host.status == '2' %}<span class="badge badge-warning">未使用</span>
+                    {% elif host.status == '3' %}<span class="badge badge-danger">故障</span>
+                    {% else %}<span class="badge badge-default">其他</span>{% endif %}
+                </span>
+            </div>
+            <div class="detail-item">
+                <label>所属机房</label>
+                <span>{{ host.idc.name|default:'-' }}</span>
+            </div>
+        </div>
+        {% if host.memo %}
+        <div style="margin-top: 20px;">
+            <label style="display: block; font-size: 12px; color: #718096; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px;">备注信息</label>
+            <div style="padding: 15px; background: #f7fafc; border-radius: 6px;">{{ host.memo }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

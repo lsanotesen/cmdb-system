@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+
+{% block title %}资产列表 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>🖥️ 资产列表</h2>
+        <div class="btn-group">
+            {% if user|has_permission:'asset_add' %}
+            <!--<a href="{% url 'asset_add' %}" class="btn btn-success">➕ 添加资产</a>-->
+            {% endif %}
+            {% if user|has_permission:'asset_add' %}
+            <a href="{% url 'asset_import' %}" class="btn">📥 Excel导入</a>
+            {% endif %}
+            {% if user|has_permission:'asset_download' %}
+            <a href="{% url 'export_assets_excel' %}" class="btn">📊 Excel导出</a>
+            <a href="{% url 'export_assets_csv' %}" class="btn btn-secondary">📄 CSV导出</a>
+            {% endif %}
+            {% if user|has_permission:'asset_delete' %}
+            <button id="batch-delete" class="btn btn-danger" onclick="batchDelete()">🗑️ 批量删除</button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="search-box">
+            <div class="form-group">
+                <label>关键词搜索</label>
+                <input type="text" name="keyword" value="{{ keyword|default:'' }}" placeholder="主机名/资产编号/IP/部门/联系人/SN" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>所属机房</label>
+                <select name="idc_id" class="form-control">
+                    <option value="">全部机房</option>
+                    {% for idc in idc_list %}
+                    <option value="{{ idc.id }}" {% if idc_id == idc.id|stringformat:"s" %}selected{% endif %}>{{ idc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>机柜</label>
+                <select name="cabinet" class="form-control">
+                    <option value="">全部机柜</option>
+                    {% for cabinet in cabinet_list %}
+                    <option value="{{ cabinet }}" {% if cabinet_filter == cabinet %}selected{% endif %}>{{ cabinet }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>设备类型</label>
+                <select name="asset_type" class="form-control">
+                    <option value="">全部类型</option>
+                    {% for value, name in asset_types %}
+                    <option value="{{ value }}" {% if asset_type == value %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>设备状态</label>
+                <select name="status" class="form-control">
+                    <option value="">全部状态</option>
+                    {% for value, name in asset_status %}
+                    <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>资产组</label>
+                <select name="group" class="form-control">
+                    <option value="">全部资产组</option>
+                    {% for group in host_groups %}
+                    <option value="{{ group.id }}" {% if group_filter == group.id|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0;">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn">🔍 搜索</button>
+                <a href="{% url 'asset_list' %}" class="btn btn-secondary">重置</a>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all" onclick="selectAll()"></th>
+                        <th>主机名</th>
+                        <th>资产编号</th>
+                        <th>机柜位置</th>
+                        <th>部门</th>
+                        <th>设备类型</th>
+                        <th>IP地址</th>
+                        <th>责任人</th>
+                        <th>品牌型号</th>
+                        <th>CPU型号</th>
+                        <th>CPU数量</th>
+                        <th>CPU核数</th>
+                        <th>GPU</th>
+                        <th>内存</th>
+                        <th>硬盘</th>
+                        <th>操作系统</th>
+                        <th>序列号</th>
+                        <th>带外IP</th>
+                        <th>上架时间</th>
+                        <th>设备状态</th>
+                        <th>所属机房</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts %}
+                    <tr>
+                        <td><input type="checkbox" class="host-checkbox" value="{{ host.id }}"></td>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.asset_no|default:'-' }}</td>
+                        <td>{{ host.cabinet_position|default:'-' }}</td>
+                        <td>{{ host.department|default:'-' }}</td>
+                        <td>
+                            {% if host.asset_type == '1' %}<span class="badge badge-info">物理机</span>
+                            {% elif host.asset_type == '2' %}<span class="badge badge-default">虚拟机</span>
+                            {% elif host.asset_type == '3' %}<span class="badge badge-warning">容器</span>
+                            {% elif host.asset_type == '4' %}<span class="badge badge-success">网络设备</span>
+                            {% elif host.asset_type == '5' %}<span class="badge badge-danger">安全设备</span>
+                            {% else %}<span class="badge badge-default">其他</span>{% endif %}
+                        </td>
+                        <td>{{ host.ip }}</td>
+                        <td>{{ host.contact_person|default:'-' }}</td>
+                        <td>{{ host.device_model|default:'-' }}</td>
+                        <td>{{ host.cpu_model|default:'-' }}</td>
+                        <td>{{ host.cpu_num|default:'-' }}</td>
+                        <td>{{ host.cpu_cores|default:'-' }}</td>
+                        <td>{{ host.gpu_model|default:'-'|safe }}</td>
+                        <td>{{ host.memory|default:'-' }}</td>
+                        <td>{{ host.disk|default:'-' }}</td>
+                        <td>{{ host.os|default:'-' }}</td>
+                        <td>{{ host.sn|default:'-' }}</td>
+                        <td>{{ host.bm_ip|default:'-' }}</td>
+                        <td>{{ host.up_time|default:'-' }}</td>
+                        <td>
+                            {% if host.status == '1' %}<span class="badge badge-success">使用中</span>
+                            {% elif host.status == '2' %}<span class="badge badge-default">未使用</span>
+                            {% elif host.status == '3' %}<span class="badge badge-danger">故障</span>
+                            {% elif host.status == '4' %}<span class="badge badge-default">其他</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ host.idc.name|default:'-' }}</td>
+                        <td>{{ host.memo|default:'-'|truncatewords:3 }}</td>
+                        <td class="actions">
+                            <a href="{% url 'asset_detail' host.id %}" class="btn btn-sm">详情</a>
+                            {% if user|has_permission:'asset_edit' %}
+                            <a href="{% url 'asset_edit' host.id %}" class="btn btn-sm">编辑</a>
+                            {% endif %}
+                            {% if user|has_permission:'asset_delete' %}
+                            <a href="{% url 'asset_delete' host.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除资产 {{ host.hostname }}?')">删除</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="24" class="text-center">暂无资产数据，请 <a href="{% url 'asset_add' %}">添加资产</a> 或 <a href="{% url 'asset_import' %}">导入Excel</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if hosts.has_other_pages %}
+        <div class="pagination">
+            {% if hosts.has_previous %}
+            <a href="?page={{ hosts.previous_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if idc_id %}&idc_id={{ idc_id }}{% endif %}{% if asset_type %}&asset_type={{ asset_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}">上一页</a>
+            {% else %}
+            <span class="disabled">上一页</span>
+            {% endif %}
+            <span>第 {{ hosts.number }} / {{ hosts.paginator.num_pages }} 页</span>
+            {% if hosts.has_next %}
+            <a href="?page={{ hosts.next_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if idc_id %}&idc_id={{ idc_id }}{% endif %}{% if asset_type %}&asset_type={{ asset_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if group_filter %}&group={{ group_filter }}{% endif %}">下一页</a>
+            {% else %}
+            <span class="disabled">下一页</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// 全选/取消全选
+function selectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const hostCheckboxes = document.querySelectorAll('.host-checkbox');
+    hostCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+}
+
+// 批量删除
+function batchDelete() {
+    const selectedCheckboxes = document.querySelectorAll('.host-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        alert('请选择要删除的资产');
+        return;
+    }
+    
+    if (!confirm('确定要删除选中的 ' + selectedCheckboxes.length + ' 个资产吗？')) {
+        return;
+    }
+    
+    const selectedIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+    
+    // 发送POST请求删除选中的资产
+    fetch('{% url "asset_batch_delete" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ ids: selectedIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('批量删除成功');
+            window.location.reload();
+        } else {
+            alert('批量删除失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('批量删除失败:', error);
+        alert('批量删除时发生错误');
+    });
+}
+</script>
+{% endblock %}

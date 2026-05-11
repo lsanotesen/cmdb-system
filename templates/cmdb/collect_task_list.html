@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}采集任务管理 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📡 采集任务列表</h2>
+        <div class="btn-group">
+            <a href="{% url 'collect_task_add' %}" class="btn btn-success">➕ 新建任务</a>
+            <a href="{% url 'collect_history' %}" class="btn">📋 采集历史</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>任务名称</th>
+                        <th>目标服务器</th>
+                        <th>目标主机</th>
+                        <th>采集选项</th>
+                        <th>定时采集</th>
+                        <th>状态</th>
+                        <th>上次执行</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td><strong>{{ task.name }}</strong></td>
+                        <td>
+                            {% if task.bastion %}
+                                <span class="badge badge-info">{{ task.bastion.name }}</span>
+                            {% else %}
+                                <span class="badge badge-default">直连</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task.target_hosts|truncatechars:30 }}</td>
+                        <td>
+                            {% if task.collect_online_only %}
+                                <span class="badge badge-warning">仅在线</span>
+                            {% else %}
+                                <span class="badge badge-default">采集全部</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.is_auto_collect %}
+                                <span class="badge badge-success">{{ task.cron_expression }}</span>
+                            {% else %}
+                                <span class="badge badge-default">手动</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.is_enabled %}
+                                <span class="badge badge-success">启用</span>
+                            {% else %}
+                                <span class="badge badge-default">禁用</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if task.last_collect_time %}
+                                {% if task.last_collect_status == 'success' %}
+                                    <span class="badge badge-success">{{ task.last_collect_time|date:"m-d H:i" }}</span>
+                                {% elif task.last_collect_status == 'partial' %}
+                                    <span class="badge badge-warning">{{ task.last_collect_time|date:"m-d H:i" }}</span>
+                                {% else %}
+                                    <span class="badge badge-danger">{{ task.last_collect_time|date:"m-d H:i" }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span style="color: #a0aec0;">从未执行</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            <a href="{% url 'immediate_collect' task.id %}" class="btn btn-sm btn-primary">⚡ 立即采集</a>
+                            <a href="{% url 'run_collect_task' task.id %}" class="btn btn-sm btn-success">▶️ 定时执行</a>
+                            <a href="{% url 'collect_task_edit' task.id %}" class="btn btn-sm btn-secondary">✏️ 编辑</a>
+                            <a href="{% url 'collect_task_delete' task.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除该任务？')">🗑️ 删除</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center" style="padding: 40px;">
+                            <p style="color: #718096; margin: 0;">暂无采集任务</p>
+                            <a href="{% url 'collect_task_add' %}" class="btn btn-success" style="margin-top: 15px;">➕ 创建第一个任务</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

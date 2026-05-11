@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>添加机房</h2>
+    </div>
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>机房标识 *</label>
+                <input type="text" name="ids" class="form-control" required placeholder="如: IDC-BJ-01">
+            </div>
+            <div class="form-group">
+                <label>机房名称 *</label>
+                <input type="text" name="name" class="form-control" required placeholder="如: 北京机房">
+            </div>
+            <div class="form-group">
+                <label>机房地址</label>
+                <input type="text" name="address" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" name="tel" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>客户经理</label>
+                <input type="text" name="contact" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>移动电话</label>
+                <input type="text" name="contact_phone" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>机柜信息</label>
+                <input type="text" name="jigui" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>IP范围</label>
+                <input type="text" name="ip_range" class="form-control" placeholder="如: 192.168.1.0/24">
+            </div>
+            <div class="form-group">
+                <label>接入带宽</label>
+                <input type="text" name="bandwidth" class="form-control" placeholder="如: 10G">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-success">保存</button>
+                <a href="{% url 'idc_list' %}" class="btn btn-secondary">返回</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

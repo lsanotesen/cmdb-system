@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>机房列表</h2>
+    </div>
+    <div class="panel-body">
+        <div style="margin-bottom: 20px;">
+            <a href="{% url 'idc_add' %}" class="btn btn-success">+ 添加机房</a>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>机房标识</th>
+                    <th>机房名称</th>
+                    <th>地址</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for idc in idcs %}
+                <tr>
+                    <td>{{ idc.ids }}</td>
+                    <td>{{ idc.name }}</td>
+                    <td>{{ idc.address|default:'-' }}</td>
+                    <td class="actions">
+                        <a href="{% url 'idc_edit' idc.id %}" class="btn">编辑</a>
+                        <a href="{% url 'idc_delete' idc.id %}" class="btn btn-danger" onclick="return confirm('确定删除?')">删除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">暂无数据</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

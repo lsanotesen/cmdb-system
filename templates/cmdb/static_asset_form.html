@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}添加静态资产{% else %}编辑静态资产{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 添加静态资产{% else %}✏️ 编辑静态资产{% endif %}</h2>
+    </div>
+    <div class="card-body">
+        <form method="post" class="form-horizontal">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="serial_number">序号</label>
+                    <input type="text" id="serial_number" name="serial_number" value="{{ asset.serial_number|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="asset_no">服务器资产编号 *</label>
+                    <input type="text" id="asset_no" name="asset_no" value="{{ asset.asset_no|default:'' }}" class="form-control" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="cabinet">机柜</label>
+                    <input type="text" id="cabinet" name="cabinet" value="{{ asset.cabinet|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="start_u">开始U数</label>
+                    <input type="text" id="start_u" name="start_u" value="{{ asset.start_u|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="end_u">结束U数</label>
+                    <input type="text" id="end_u" name="end_u" value="{{ asset.end_u|default:'' }}" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="department">使用部门/团队（负责人）</label>
+                    <input type="text" id="department" name="department" value="{{ asset.department|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="server_type">服务器类型</label>
+                    <input type="text" id="server_type" name="server_type" value="{{ asset.server_type|default:'' }}" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="ip">IP地址</label>
+                    <input type="text" id="ip" name="ip" value="{{ asset.ip|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="contact_person">联系人/责任人/使用人</label>
+                    <input type="text" id="contact_person" name="contact_person" value="{{ asset.contact_person|default:'' }}" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="device_model">服务器品牌型号</label>
+                    <input type="text" id="device_model" name="device_model" value="{{ asset.device_model|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="server_model">服务器机型（CPU/GPU卡型数量）</label>
+                    <input type="text" id="server_model" name="server_model" value="{{ asset.server_model|default:'' }}" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="power_rating">服务器额定功率</label>
+                    <input type="text" id="power_rating" name="power_rating" value="{{ asset.power_rating|default:'' }}" class="form-control">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="status">状态</label>
+                    <input type="text" id="status" name="status" value="{{ asset.status|default:'' }}" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-12">
+                    <label for="memo">备注</label>
+                    <textarea id="memo" name="memo" rows="3" class="form-control">{{ asset.memo|default:'' }}</textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">保存</button>
+                <a href="{% url 'static_asset_list' %}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

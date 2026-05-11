@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}添加目标服务器{% else %}编辑目标服务器{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 添加目标服务器{% else %}✏️ 编辑目标服务器{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'target_server_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" style="max-width: 800px;">
+            {% csrf_token %}
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>配置名称 *</label>
+                    <input type="text" name="name" class="form-control" required value="{{ config.name|default:'' }}" placeholder="如: 北京机房SSH跳板机">
+                </div>
+                <div class="form-group">
+                    <label>SSH服务器IP *</label>
+                    <input type="text" name="host" class="form-control" required value="{{ config.host|default:'' }}" placeholder="如: 192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label>SSH端口</label>
+                    <input type="number" name="port" class="form-control" value="{{ config.port|default:22 }}" placeholder="22">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>用户名 *</label>
+                    <input type="text" name="username" class="form-control" required value="{{ config.username|default:'' }}" placeholder="SSH用户名">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" name="password" class="form-control" value="{{ config.password|default:'' }}" placeholder="留空则使用私钥认证">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>私钥内容</label>
+                <textarea name="private_key" class="form-control" rows="5" placeholder="粘贴私钥内容（RSA/DSA/ECDSA），留空则使用密码认证">{% if config.private_key %}{{ config.private_key }}{% endif %}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label>采集资产类型</label>
+                <select name="collect_asset_types" class="form-control">
+                    <option value="1" {% if config.collect_asset_types == '1' %}selected{% endif %}>仅物理机</option>
+                    <option value="1,2" {% if config.collect_asset_types == '1,2' %}selected{% endif %}>物理机 + 虚拟机</option>
+                    <option value="1,2,3" {% if config.collect_asset_types == '1,2,3' %}selected{% endif %}>物理机 + 虚拟机 + 容器</option>
+                    <option value="1,2,3,6" {% if config.collect_asset_types == '1,2,3,6' %}selected{% endif %}>全部（不含网络设备）</option>
+                </select>
+                <small style="color: #718096;">交换机等网络设备无法通过SSH采集硬件信息，请选择合适的类型</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_enabled" {% if config.is_enabled or action == 'add' %}checked{% endif %}>
+                    启用该配置
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3" placeholder="备注信息">{{ config.memo|default:'' }}</textarea>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <button type="submit" class="btn btn-success" style="padding: 12px 40px;">
+                    {% if action == 'add' %}➕ 创建配置{% else %}💾 保存修改{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

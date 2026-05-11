@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>编辑机柜</h2>
+    </div>
+    <div class="panel-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>机柜名称 *</label>
+                <input type="text" name="name" class="form-control" value="{{ cabinet.name }}" required>
+            </div>
+            <div class="form-group">
+                <label>所属机房</label>
+                <select name="idc" class="form-control">
+                    <option value="">请选择</option>
+                    {% for idc in idc_list %}
+                    <option value="{{ idc.id }}" {% if cabinet.idc_id == idc.id %}selected{% endif %}>{{ idc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <input type="text" name="desc" class="form-control" value="{{ cabinet.desc }}">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-success">保存</button>
+                <a href="{% url 'cabinet_list' %}" class="btn btn-secondary">返回</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

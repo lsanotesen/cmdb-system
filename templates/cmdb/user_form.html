@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{% if user.id %}编辑用户{% else %}添加用户{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2 style="margin: 0; font-size: 24px; font-weight: 600; color: #2d3748;">
+        {% if user.id %}✏️ 编辑用户{% else %}➕ 添加用户{% endif %}
+    </h2>
+    <a href="{% url 'user_management' %}" class="btn btn-secondary">← 返回列表</a>
+</div>
+
+<form method="post" id="user-form">
+    {% csrf_token %}
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}" style="padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2>{% if user.id %}编辑用户信息{% else %}创建新用户{% endif %}</h2>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <div class="form-group">
+                        <label for="username">用户名 <span style="color: #f56565;">*</span></label>
+                        <input type="text" name="username" id="username" class="form-control"
+                               value="{{ user.username|default:'' }}"
+                               {% if user.id %}readonly{% endif %}
+                               placeholder="请输入用户名" required>
+                        <small style="color: #718096; font-size: 12px;">用户名只能包含字母、数字和下划线</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">邮箱</label>
+                        <input type="email" name="email" id="email" class="form-control"
+                               value="{{ user.email|default:'' }}"
+                               placeholder="请输入邮箱地址">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="real_name">真实姓名</label>
+                        <input type="text" name="real_name" id="real_name" class="form-control"
+                               value="{{ profile.real_name|default:'' }}"
+                               placeholder="请输入真实姓名">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="form-group">
+                        <label for="password">密码 {% if not user.id %}<span style="color: #f56565;">*</span>{% endif %}</label>
+                        <input type="password" name="password" id="password" class="form-control"
+                               placeholder="{% if user.id %}留空则保持原密码{% else %}请输入密码{% endif %}"
+                               {% if not user.id %}required{% endif %}>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm_password">确认密码 {% if not user.id %}<span style="color: #f56565;">*</span>{% endif %}</label>
+                        <input type="password" name="confirm_password" id="confirm_password" class="form-control"
+                               placeholder="{% if user.id %}留空则保持原密码{% else %}请再次输入密码{% endif %}"
+                               {% if not user.id %}required{% endif %}>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="role">角色</label>
+                        <select name="role" id="role" class="form-control">
+                            <option value="">-- 请选择角色 --</option>
+                            {% for role in roles %}
+                            <option value="{{ role.id }}" {% if profile.role_id == role.id %}selected{% endif %}>
+                                {{ role.name }} - {{ role.description|default:"无描述" }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="is_active" value="1"
+                                   {% if user.is_active or not user.id %}checked{% endif %}>
+                            启用该用户
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>🔐 权限配置</h2>
+        </div>
+        <div class="card-body">
+
+            <div style="margin-bottom: 20px; padding: 15px; background: #f7fafc; border-radius: 8px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="use_role_permissions" value="1" id="use_role_permissions"
+                           {% if not user_permissions or not user_permissions|length %}checked{% endif %}
+                           onchange="togglePermissionSection()">
+                    <strong>使用角色权限</strong>
+                    <span style="color: #718096; font-size: 13px;">（勾选后将使用所选角色的默认权限）</span>
+                </label>
+            </div>
+
+            <div id="custom-permission-section" style="display: {% if not user_permissions or not user_permissions|length %}none{% else %}block{% endif %};">
+                <h3 style="font-size: 16px; color: #4a5568; margin-bottom: 15px;">自定义权限 - 选择用户可以访问的模块和权限</h3>
+
+                <div style="margin-bottom: 15px; padding: 10px; background: #edf2f7; border-radius: 6px;">
+                    <span style="font-weight: 500; margin-right: 15px;">快速选择:</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAllPermissions()">清空</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllView()">全选查看</button>
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="selectAllRead()">全选只读</button>
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="selectAll()">全选所有</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f7fafc;">
+                                <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568; width: 200px;">模块</th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568;">
+                                    <label style="cursor: pointer;">
+                                        <input type="checkbox" id="select_all_view" onchange="toggleAll('view')">
+                                        查看
+                                    </label>
+                                </th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568;">
+                                    <label style="cursor: pointer;">
+                                        <input type="checkbox" id="select_all_add" onchange="toggleAll('add')">
+                                        添加
+                                    </label>
+                                </th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568;">
+                                    <label style="cursor: pointer;">
+                                        <input type="checkbox" id="select_all_edit" onchange="toggleAll('edit')">
+                                        编辑
+                                    </label>
+                                </th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568;">
+                                    <label style="cursor: pointer;">
+                                        <input type="checkbox" id="select_all_delete" onchange="toggleAll('delete')">
+                                        删除
+                                    </label>
+                                </th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #4a5568;">
+                                    <label style="cursor: pointer;">
+                                        <input type="checkbox" id="select_all_download" onchange="toggleAll('download')">
+                                        下载
+                                    </label>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for module in modules %}
+                            <tr>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-weight: 500;">
+                                    <strong>{{ module.name }}</strong>
+                                    <div style="font-size: 12px; color: #718096; font-weight: normal;">{{ module.code }}</div>
+                                </td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                                    <input type="checkbox" name="permissions" value="{{ module.code }}_view"
+                                           {% if module.code|add:"_view" in user_permissions %}checked{% endif %}
+                                           class="permission-checkbox" data-type="view">
+                                </td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                                    <input type="checkbox" name="permissions" value="{{ module.code }}_add"
+                                           {% if module.code|add:"_add" in user_permissions %}checked{% endif %}
+                                           class="permission-checkbox" data-type="add">
+                                </td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                                    <input type="checkbox" name="permissions" value="{{ module.code }}_edit"
+                                           {% if module.code|add:"_edit" in user_permissions %}checked{% endif %}
+                                           class="permission-checkbox" data-type="edit">
+                                </td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                                    <input type="checkbox" name="permissions" value="{{ module.code }}_delete"
+                                           {% if module.code|add:"_delete" in user_permissions %}checked{% endif %}
+                                           class="permission-checkbox" data-type="delete">
+                                </td>
+                                <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center;">
+                                    <input type="checkbox" name="permissions" value="{{ module.code }}_download"
+                                           {% if module.code|add:"_download" in user_permissions %}checked{% endif %}
+                                           class="permission-checkbox" data-type="download">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 30px;">
+                <button type="submit" class="btn btn-primary">
+                    💾 {% if user.id %}保存修改{% else %}创建用户{% endif %}
+                </button>
+                <a href="{% url 'user_management' %}" class="btn btn-secondary">取消</a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+function togglePermissionSection() {
+    const useRole = document.getElementById('use_role_permissions').checked;
+    const customSection = document.getElementById('custom-permission-section');
+    customSection.style.display = useRole ? 'none' : 'block';
+}
+
+function toggleAll(type) {
+    const checkbox = document.getElementById('select_all_' + type);
+    const checkboxes = document.querySelectorAll('.permission-checkbox[data-type="' + type + '"]');
+    checkboxes.forEach(cb => cb.checked = checkbox.checked);
+}
+
+function clearAllPermissions() {
+    document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input[id^="select_all_"]').forEach(cb => cb.checked = false);
+}
+
+function selectAllView() {
+    clearAllPermissions();
+    document.querySelectorAll('.permission-checkbox[data-type="view"]').forEach(cb => cb.checked = true);
+    document.getElementById('select_all_view').checked = true;
+}
+
+function selectAllRead() {
+    clearAllPermissions();
+    ['view', 'download'].forEach(type => {
+        document.querySelectorAll('.permission-checkbox[data-type="' + type + '"]').forEach(cb => cb.checked = true);
+        const selectAll = document.getElementById('select_all_' + type);
+        if (selectAll) selectAll.checked = true;
+    });
+}
+
+function selectAll() {
+    document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = true);
+    document.querySelectorAll('input[id^="select_all_"]').forEach(cb => cb.checked = true);
+}
+
+document.querySelectorAll('input[type="checkbox"][id^="select_all_"]').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const type = this.id.replace('select_all_', '');
+        const checkboxes = document.querySelectorAll('.permission-checkbox[data-type="' + type + '"]');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+});
+</script>
+{% endblock %}

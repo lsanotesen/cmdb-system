@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}新建命令任务{% else %}编辑命令任务{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 新建命令任务{% else %}✏️ 编辑命令任务{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'batch_command_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" style="max-width: 900px;">
+            {% csrf_token %}
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>任务名称 *</label>
+                    <input type="text" name="name" class="form-control" required value="{{ command.name|default:'' }}" placeholder="如: 批量更新软件">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>跳板机</label>
+                    <select name="bastion" class="form-control">
+                        <option value="">-- 直连（不通过跳板机）--</option>
+                        {% for b in bastion_list %}
+                        <option value="{{ b.id }}" {% if command and command.bastion_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.host }})</option>
+                        {% endfor %}
+                    </select>
+                    <small style="color: #718096;">留空则直连目标服务器</small>
+                </div>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">🎯 目标主机</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>目标资产组</label>
+                        <select name="target_group" class="form-control">
+                            <option value="">-- 不选择资产组 --</option>
+                            {% for group in host_groups %}
+                            <option value="{{ group.id }}" {% if command and command.target_group_id == group.id %}selected{% endif %}>{{ group.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small style="color: #718096;">选择资产组后，将在该组内的所有主机上执行命令</small>
+                    </div>
+                    <div class="form-group">
+                        <label>IP范围或列表</label>
+                        <textarea name="target_hosts" class="form-control" rows="2" placeholder="192.168.1.1-254 或 192.168.1.1,192.168.1.2">{{ command.target_hosts|default:'' }}</textarea>
+                        <small style="color: #718096;">支持格式: IP范围 (192.168.1.1-254) 或多个IP用逗号分隔。如果已选择资产组，此处可留空。</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">🔑 目标服务器认证</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>SSH端口</label>
+                            <input type="number" name="target_port" class="form-control" value="{{ command.target_port|default:22 }}" placeholder="22">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>用户名</label>
+                            <input type="text" name="target_username" class="form-control" value="{{ command.target_username|default:'root' }}" placeholder="root">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label>密码</label>
+                            <input type="password" name="target_password" class="form-control" value="{{ command.target_password|default:'' }}" placeholder="留空则使用私钥">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>私钥</label>
+                        <textarea name="target_private_key" class="form-control" rows="4" placeholder="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----">{{ command.target_private_key|default:'' }}</textarea>
+                        <small style="color: #718096;">留空则使用密码认证</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>命令内容 *</label>
+                <textarea name="command" class="form-control" rows="4" required placeholder="要执行的命令，多条命令请用分号分隔">{{ command.command|default:'' }}</textarea>
+                <small style="color: #718096;">示例: yum update -y; echo "done" > /tmp/result.txt</small>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">⚙️ 执行选项</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="run_as_root" {% if command and command.run_as_root %}{% elif action == 'add' %}checked{% endif %}>
+                            以root权限执行（通过sudo）
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="jump_via_bastion" {% if command and command.jump_via_bastion %}checked{% endif %}>
+                            通过跳板机免密跳转（跳板机需已配置SSH密钥交换，可免密登录目标；不勾选则读取目标服务器的密码）
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="is_enabled" {% if command and command.is_enabled %}{% elif action == 'add' %}checked{% endif %}>
+                            启用该任务
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3" placeholder="备注信息">{{ command.memo|default:'' }}</textarea>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <button type="submit" class="btn btn-success" style="padding: 12px 40px;">
+                    {% if action == 'add' %}➕ 创建任务{% else %}💾 保存修改{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

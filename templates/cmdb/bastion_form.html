@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}添加跳板机{% else %}编辑跳板机{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 添加跳板机{% else %}✏️ 编辑跳板机{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'bastion_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" style="max-width: 700px;">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label>名称 *</label>
+                <input type="text" name="name" class="form-control" required value="{{ bastion.name|default:'默认跳板机' }}" placeholder="如: 北京机房跳板机">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <label>跳板机IP *</label>
+                    <input type="text" name="host" class="form-control" required value="{{ bastion.host|default:'' }}" placeholder="如: 192.168.12.1">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>端口</label>
+                    <input type="number" name="port" class="form-control" value="{{ bastion.port|default:22 }}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>用户名 *</label>
+                <input type="text" name="username" class="form-control" required value="{{ bastion.username|default:'root' }}" placeholder="登录跳板机的用户名">
+            </div>
+
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" name="password" class="form-control" value="{{ bastion.password|default:'' }}" placeholder="留空则使用私钥登录">
+            </div>
+
+            <div class="form-group">
+                <label>私钥</label>
+                <textarea name="private_key" class="form-control" rows="4" placeholder="粘贴私钥内容（如 ~/.ssh/id_rsa）">{{ bastion.private_key|default:'' }}</textarea>
+                <small style="color: #718096;">私钥优先级高于密码，若跳板机使用私钥登录请填写此项</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_enabled" {% if bastion.is_enabled or action == 'add' %}checked{% endif %}>
+                    启用该跳板机
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="2" placeholder="备注信息">{{ bastion.memo|default:'' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">保存</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

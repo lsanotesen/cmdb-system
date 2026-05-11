@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block title %}导入静态资产 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📥 导入静态资产</h2>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data" class="form-horizontal">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="file">选择Excel文件</label>
+                <input type="file" id="file" name="file" class="form-control" accept=".xlsx,.xls">
+            </div>
+            <div class="form-group">
+                <label>导入说明</label>
+                <ul class="list-group">
+                    <li class="list-group-item">请确保Excel文件包含以下列：序号、服务器资产编号、机柜、开始U数、结束U数、使用部门/团队（负责人）、服务器类型、IP地址、联系人/责任人/使用人、服务器品牌型号、服务器机型（CPU/GPU卡型数量）、服务器额定功率、备注、状态</li>
+                    <li class="list-group-item">导入时会自动跳过空行和无效数据</li>
+                    <li class="list-group-item">已存在的静态资产会被覆盖</li>
+                </ul>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">导入</button>
+                <a href="{% url 'static_asset_list' %}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

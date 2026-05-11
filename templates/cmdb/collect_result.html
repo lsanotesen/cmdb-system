@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block title %}采集结果 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📡 采集任务执行结果</h2>
+        <div class="btn-group">
+            <a href="{% url 'collect_task_list' %}" class="btn btn-secondary">← 返回任务列表</a>
+            <a href="{% url 'collect_history' %}" class="btn">📋 查看历史记录</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="stats-grid" style="margin-bottom: 25px;">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">✓</div>
+                <div class="stat-info">
+                    <h3 style="color: #48bb78;">{{ success_count }}</h3>
+                    <p>成功</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); color: white;">✗</div>
+                <div class="stat-info">
+                    <h3 style="color: #f56565;">{{ fail_count }}</h3>
+                    <p>失败</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📊</div>
+                <div class="stat-info">
+                    <h3>{{ task.target_server.name }}</h3>
+                    <p>目标服务器</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f39c12 0%, #d68910 100%); color: white;">⏱️</div>
+                <div class="stat-info">
+                    <h3>{% now "Y-m-d H:i:s" %}</h3>
+                    <p>执行时间</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>IP地址</th>
+                        <th>主机名</th>
+                        <th>状态</th>
+                        <th>错误信息</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                    <tr>
+                        <td><code>{{ result.ip }}</code></td>
+                        <td>{{ result.hostname|default:'-' }}</td>
+                        <td>
+                            {% if result.status == 'success' %}
+                                <span class="badge badge-success">成功</span>
+                            {% else %}
+                                <span class="badge badge-danger">失败</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.error %}
+                                <span style="color: #e53e3e; font-size: 12px;">{{ result.error }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center" style="padding: 40px;">
+                            <p style="color: #718096; margin: 0;">没有采集任何主机</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,604 @@
+{% extends 'base.html' %}
+
+{% block title %}首页 - 资产管理系统{% endblock %}
+
+{% block content %}
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">🖥️</div>
+        <div class="stat-info">
+            <h3>{{ host_count|default:0 }}</h3>
+            <p>动态资产</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white;">📋</div>
+        <div class="stat-info">
+            <h3>{{ static_asset_count|default:0 }}</h3>
+            <p>静态资产</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">🏢</div>
+        <div class="stat-info">
+            <h3>{{ idc_count|default:0 }}</h3>
+            <p>机房数量</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #f39c12 0%, #d68910 100%); color: white;">🗄️</div>
+        <div class="stat-info">
+            <h3>{{ cabinet_count|default:0 }}</h3>
+            <p>机柜数量</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #dd4b39 0%, #c03e2e 100%); color: white;">📁</div>
+        <div class="stat-info">
+            <h3>{{ host_group_count|default:0 }}</h3>
+            <p>动态资产组</p>
+        </div>
+    </div>
+</div>
+
+<!-- 状态分布和类型分布 -->
+<div class="row">
+    <!-- 资产状态分布 -->
+    <div class="card" style="flex: 1; margin-right: 20px;">
+        <div class="card-header">
+            <h2>资产状态分布</h2>
+        </div>
+        <div class="card-body" style="min-height: 180px;">
+            <div style="display: flex; align-items: center; gap: 15px; padding: 10px;">
+                <div style="position: relative; width: 140px; height: 140px; flex-shrink: 0;">
+                    <canvas id="statusChart" width="140" height="140"></canvas>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                        <div style="font-size: 24px; font-weight: 700; color: #1a1a1a; line-height: 1.2;">{{ static_asset_count|default:0 }}</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 1px;">总数</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 180px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 10px; height: 10px; background: #48bb78; border-radius: 2px; flex-shrink: 0;"></span>
+                        <span style="font-size: 12px; color: #666; width: 40px;">在用</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #1a1a1a; width: 35px; text-align: right;">{{ online_count|default:0 }}</span>
+                        <span style="font-size: 12px; color: #999; width: 45px; text-align: right;">{{ online_rate }}%</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 10px; height: 10px; background: #fc8181; border-radius: 2px; flex-shrink: 0;"></span>
+                        <span style="font-size: 12px; color: #666; width: 40px;">下架</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #1a1a1a; width: 35px; text-align: right;">{{ offline_count|default:0 }}</span>
+                        <span style="font-size: 12px; color: #999; width: 45px; text-align: right;">{{ offline_rate }}%</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 10px; height: 10px; background: #a0aec0; border-radius: 2px; flex-shrink: 0;"></span>
+                        <span style="font-size: 12px; color: #666; width: 40px;">其他</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #1a1a1a; width: 35px; text-align: right;">{{ other_count|default:0 }}</span>
+                        <span style="font-size: 12px; color: #999; width: 45px; text-align: right;">{{ other_rate }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 资产类型分布 -->
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h2>资产类型分布</h2>
+        </div>
+        <div class="card-body" style="min-height: 180px;">
+            <div style="display: flex; align-items: center; gap: 15px; padding: 10px;">
+                <div style="position: relative; width: 140px; height: 140px; flex-shrink: 0;">
+                    <canvas id="typeChart" width="140" height="140"></canvas>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                        <div style="font-size: 24px; font-weight: 700; color: #1a1a1a; line-height: 1.2;">{{ static_asset_count|default:0 }}</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 1px;">总数</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px; width: 180px;">
+                    {% for item in asset_type_dist %}
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 10px; height: 10px; background: {{ item.color }}; border-radius: 2px; flex-shrink: 0;"></span>
+                        <span style="font-size: 12px; color: #666; width: 50px;">{{ item.name }}</span>
+                        <span style="font-size: 12px; font-weight: 600; color: #1a1a1a; width: 35px; text-align: right;">{{ item.count }}</span>
+                        <span style="font-size: 12px; color: #999; width: 45px; text-align: right;">{{ item.percentage }}%</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 数据备份记录和操作日志 -->
+<div class="row">
+    <!-- 数据备份记录 -->
+    <div class="card" style="flex: 1; margin-right: 20px;">
+        <div class="card-header">
+            <h2>数据备份记录</h2>
+        </div>
+        <div class="card-body">
+            {% if recent_backups %}
+            <table class="mini-table">
+                <thead>
+                    <tr>
+                        <th>备份名称</th>
+                        <th>备份类型</th>
+                        <th>备份时间</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for backup in recent_backups %}
+                    <tr>
+                        <td>{{ backup.backup_name }}</td>
+                        <td>{{ backup.get_backup_type_display }}</td>
+                        <td>{{ backup.backup_time|date:"m-d H:i" }}</td>
+                        <td>
+                            {% if backup.status == 'success' %}
+                            <span class="badge badge-success">成功</span>
+                            {% elif backup.status == 'running' %}
+                            <span class="badge badge-warning">运行中</span>
+                            {% else %}
+                            <span class="badge badge-danger">失败</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-text">暂无备份记录</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 最近操作日志 -->
+    <div class="card" style="flex: 1;">
+        <div class="card-header">
+            <h2>最近操作日志</h2>
+        </div>
+        <div class="card-body">
+            <div class="operation-list">
+                {% for op in recent_operations %}
+                <div class="operation-item" style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eee;">
+                    <span class="operation-time" style="color: #999; font-size: 13px; min-width: 140px;">{{ op.time }}</span>
+                    <span class="operation-content" style="flex: 1; color: #333; font-size: 13px;">{{ op.content }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 系统信息 -->
+<div class="card">
+    <div class="card-header">
+        <h2>系统概览</h2>
+    </div>
+    <div class="card-body">
+        <div class="detail-grid">
+            <div class="detail-item">
+                <label>系统版本</label>
+                <span>资产管理系统 v10.0.0</span>
+            </div>
+            <div class="detail-item">
+                <label>当前时间</label>
+                <span>{% now "Y-m-d H:i:s" %}</span>
+            </div>
+            <div class="detail-item">
+                <label>数据库状态</label>
+                <span class="badge badge-success">正常</span>
+            </div>
+            <div class="detail-item">
+                <label>SSH配置数</label>
+                <span>{{ ssh_config_count|default:0 }}</span>
+            </div>
+            <div class="detail-item">
+                <label>采集任务数</label>
+                <span>{{ collect_task_count|default:0 }}</span>
+            </div>
+            <div class="detail-item">
+                <label>批量命令数</label>
+                <span>{{ batch_command_count|default:0 }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        transition: transform 0.2s;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+    }
+    
+    .stat-info h3 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+    
+    .stat-info p {
+        margin: 4px 0 0;
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        margin-bottom: 20px;
+    }
+    
+    .card-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .card-header h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+    
+    .card-body {
+        padding: 20px;
+    }
+    
+    .view-all {
+        color: #1890ff;
+        font-size: 14px;
+        text-decoration: none;
+    }
+    
+    .view-all:hover {
+        text-decoration: underline;
+    }
+    
+    .card-body {
+        min-height: 200px !important;
+    }
+    
+    .chart-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 20px !important;
+        padding: 10px !important;
+        width: 100% !important;
+        height: 180px !important;
+    }
+    
+    .chart-canvas-wrapper {
+        position: relative !important;
+        width: 160px !important;
+        height: 160px !important;
+        flex-shrink: 0 !important;
+        flex-grow: 0 !important;
+    }
+    
+    .chart-canvas-wrapper canvas {
+        width: 160px !important;
+        height: 160px !important;
+        max-width: 160px !important;
+        max-height: 160px !important;
+    }
+    
+    .chart-center-text {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        text-align: center !important;
+        pointer-events: none !important;
+        z-index: 10 !important;
+    }
+    
+    .center-number {
+        font-size: 28px !important;
+        font-weight: 700 !important;
+        color: #1a1a1a !important;
+        line-height: 1.2 !important;
+    }
+    
+    .center-label {
+        font-size: 12px !important;
+        color: #999 !important;
+        margin-top: 2px !important;
+    }
+    
+    .chart-legend-right {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding-left: 10px !important;
+        min-width: 150px !important;
+    }
+    
+    .legend-row {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 10px !important;
+        padding: 4px 0 !important;
+        width: 100% !important;
+    }
+    
+    .legend-color-box {
+        width: 12px !important;
+        height: 12px !important;
+        border-radius: 3px !important;
+        flex-shrink: 0 !important;
+        display: inline-block !important;
+        background-color: #48bb78 !important;
+    }
+    
+    .legend-name {
+        flex: 1 !important;
+        font-size: 13px !important;
+        color: #666 !important;
+        text-align: left !important;
+    }
+    
+    .legend-count {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        color: #1a1a1a !important;
+        min-width: 40px !important;
+        text-align: right !important;
+    }
+    
+    .legend-percent {
+        font-size: 13px !important;
+        color: #999 !important;
+        min-width: 50px !important;
+        text-align: right !important;
+    }
+    
+    .mini-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+    
+    .mini-table th, .mini-table td {
+        padding: 10px 0;
+        text-align: left;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .mini-table th {
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .mini-table td {
+        color: #333;
+    }
+    
+    .empty-text {
+        text-align: center;
+        color: #999;
+        padding: 20px;
+    }
+    
+    .operation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .operation-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        background: #fafafa;
+        border-radius: 8px;
+    }
+    
+    .operation-time {
+        font-size: 12px;
+        color: #999;
+        width: 70px;
+    }
+    
+    .operation-content {
+        flex: 1;
+        display: flex;
+        gap: 8px;
+    }
+    
+    .operation-action {
+        color: #1890ff;
+        font-size: 14px;
+    }
+    
+    .operation-target {
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .operation-user {
+        font-size: 12px;
+        color: #999;
+    }
+    
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .detail-item label {
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .detail-item span {
+        color: #333;
+        font-weight: 500;
+    }
+    
+    .badge {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .badge-success {
+        background: #f6ffed;
+        color: #52c41a;
+    }
+    
+    .badge-danger {
+        background: #fff2f0;
+        color: #ff4d4f;
+    }
+    
+    .badge-warning {
+        background: #fffbe6;
+        color: #faad14;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 资产状态分布饼图
+    var statusCtx = document.getElementById('statusChart').getContext('2d');
+    statusCtx.canvas.width = 140;
+    statusCtx.canvas.height = 140;
+    var statusChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['在用', '下架', '其他'],
+            datasets: [{
+                data: [
+                    {{ online_count|default:0 }},
+                    {{ offline_count|default:0 }},
+                    {{ other_count|default:0 }}
+                ],
+                backgroundColor: [
+                    '#48bb78',
+                    '#fc8181',
+                    '#a0aec0'
+                ],
+                borderColor: '#ffffff',
+                borderWidth: 3,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: false,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    display: false,
+                    position: 'none'
+                },
+                tooltip: {
+                    enabled: false
+                }
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true
+            }
+        }
+    });
+
+    // 资产类型分布饼图
+    var typeCtx = document.getElementById('typeChart').getContext('2d');
+    typeCtx.canvas.width = 140;
+    typeCtx.canvas.height = 140;
+    var typeData = {
+        labels: [{% for item in asset_type_dist %}'{{ item.name }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+        datasets: [{
+            data: [{% for item in asset_type_dist %}{{ item.count }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+            backgroundColor: [{% for item in asset_type_dist %}'{{ item.color }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+            borderColor: '#ffffff',
+            borderWidth: 3,
+            hoverOffset: 8
+        }]
+    };
+    
+    var typeChart = new Chart(typeCtx, {
+        type: 'doughnut',
+        data: typeData,
+        options: {
+            responsive: false,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    display: false,
+                    position: 'none'
+                },
+                tooltip: {
+                    enabled: false
+                }
+            },
+            animation: {
+                animateRotate: true,
+                animateScale: true
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

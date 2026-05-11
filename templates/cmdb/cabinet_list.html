@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="panel">
+    <div class="panel-header">
+        <h2>机柜列表</h2>
+    </div>
+    <div class="panel-body">
+        <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
+            <a href="{% url 'cabinet_add' %}" class="btn btn-success">+ 添加机柜</a>
+            <form method="get" style="display: flex; gap: 10px;">
+                <select name="idc_id" class="form-control" style="width: auto;">
+                    <option value="">全部机房</option>
+                    {% for idc in idc_list %}
+                    <option value="{{ idc.id }}">{{ idc.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn">筛选</button>
+            </form>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>机柜名称</th>
+                    <th>所属机房</th>
+                    <th>描述</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cabinet in cabinets %}
+                <tr>
+                    <td>{{ cabinet.name }}</td>
+                    <td>{{ cabinet.idc.name|default:'-' }}</td>
+                    <td>{{ cabinet.desc|default:'-' }}</td>
+                    <td class="actions">
+                        <a href="{% url 'cabinet_edit' cabinet.id %}" class="btn">编辑</a>
+                        <a href="{% url 'cabinet_delete' cabinet.id %}" class="btn btn-danger" onclick="return confirm('确定删除?')">删除</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">暂无数据</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

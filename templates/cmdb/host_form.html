@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}添加主机{% else %}编辑主机{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 添加主机{% else %}✏️ 编辑主机{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'host_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-group">
+                    <label>主机名 *</label>
+                    <input type="text" name="hostname" class="form-control" required placeholder="如: web01" value="{{ host.hostname|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>资产编号</label>
+                    <input type="text" name="asset_no" class="form-control" placeholder="如: ASSET-001" value="{{ host.asset_no|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>所在机柜位置</label>
+                    <input type="text" name="cabinet_position" class="form-control" placeholder="如: 01-05" value="{{ host.cabinet_position|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>所属部门/团队</label>
+                    <input type="text" name="department" class="form-control" placeholder="如: 技术部" value="{{ host.department|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>设备类型</label>
+                    <select name="asset_type" class="form-control">
+                        <option value="">请选择</option>
+                        <option value="1" {% if host.asset_type == '1' %}selected{% endif %}>物理机</option>
+                        <option value="2" {% if host.asset_type == '2' %}selected{% endif %}>虚拟机</option>
+                        <option value="3" {% if host.asset_type == '3' %}selected{% endif %}>容器</option>
+                        <option value="4" {% if host.asset_type == '4' %}selected{% endif %}>网络设备</option>
+                        <option value="5" {% if host.asset_type == '5' %}selected{% endif %}>安全设备</option>
+                        <option value="6" {% if host.asset_type == '6' %}selected{% endif %}>其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>IP地址 *</label>
+                    <input type="text" name="ip" class="form-control" required placeholder="如: 192.168.1.10" value="{{ host.ip|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>责任人</label>
+                    <input type="text" name="contact_person" class="form-control" placeholder="如: 张三" value="{{ host.contact_person|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>设备品牌型号</label>
+                    <input type="text" name="device_model" class="form-control" placeholder="如: Dell R740" value="{{ host.device_model|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>CPU型号</label>
+                    <input type="text" name="cpu_model" class="form-control" placeholder="如: Intel Xeon E5-2680" value="{{ host.cpu_model|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>CPU数量</label>
+                    <input type="text" name="cpu_num" class="form-control" placeholder="如: 2" value="{{ host.cpu_num|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>GPU型号</label>
+                    <input type="text" name="gpu_model" class="form-control" placeholder="如: NVIDIA Tesla T4" value="{{ host.gpu_model|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>GPU数量</label>
+                    <input type="text" name="gpu_num" class="form-control" placeholder="如: 1" value="{{ host.gpu_num|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>额定功率(W)</label>
+                    <input type="text" name="power_rating" class="form-control" placeholder="如: 750" value="{{ host.power_rating|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>内存</label>
+                    <input type="text" name="memory" class="form-control" placeholder="如: 32G" value="{{ host.memory|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>硬盘</label>
+                    <input type="text" name="disk" class="form-control" placeholder="如: 500G SSD" value="{{ host.disk|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>操作系统</label>
+                    <input type="text" name="os" class="form-control" placeholder="如: CentOS 7.9" value="{{ host.os|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>序列号</label>
+                    <input type="text" name="sn" class="form-control" placeholder="如: SN123456" value="{{ host.sn|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>带外管理IP</label>
+                    <input type="text" name="bm_ip" class="form-control" placeholder="如: 192.168.1.254" value="{{ host.bm_ip|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>上架时间</label>
+                    <input type="text" name="up_time" class="form-control" placeholder="如: 2024-01" value="{{ host.up_time|default:'' }}">
+                </div>
+                <div class="form-group">
+                    <label>设备状态</label>
+                    <select name="status" class="form-control">
+                        <option value="">请选择</option>
+                        <option value="1" {% if host.status == '1' %}selected{% endif %}>使用中</option>
+                        <option value="2" {% if host.status == '2' %}selected{% endif %}>未使用</option>
+                        <option value="3" {% if host.status == '3' %}selected{% endif %}>故障</option>
+                        <option value="4" {% if host.status == '4' %}selected{% endif %}>其他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>所属机房</label>
+                    <select name="idc" class="form-control">
+                        <option value="">请选择</option>
+                        {% for idc in idc_list %}
+                        <option value="{{ idc.id }}" {% if host.idc.id == idc.id %}selected{% endif %}>{{ idc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3" placeholder="其他补充信息">{{ host.memo|default:'' }}</textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-success">保存</button>
+                <a href="{% url 'host_list' %}" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

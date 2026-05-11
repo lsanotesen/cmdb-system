@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}资产管理系统{% endblock %}</title>
+    {% load custom_tags %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background: #f5f7fa; font-size: 14px; }
+        .layout { display: flex; min-height: 100vh; }
+        
+        /* 侧边栏 - 阿里云风格 */
+        .sidebar { width: 240px; background: #fff; border-right: 1px solid #e8e8e8; display: flex; flex-direction: column; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 20px 24px; border-bottom: 1px solid #e8e8e8; background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%); }
+        .sidebar-header h1 { margin: 0; font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .sidebar-header .subtitle { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+        .sidebar-nav { flex: 1; padding: 12px 0; }
+        .nav-section { padding: 8px 0; }
+        .nav-section-title { padding: 8px 20px; font-size: 12px; color: #999; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+        .nav-item { margin: 0 8px; border-radius: 6px; transition: all 0.2s ease; }
+        .nav-item a { display: flex; align-items: center; gap: 12px; padding: 11px 16px; color: #595959; text-decoration: none; font-size: 14px; border-radius: 6px; transition: all 0.2s ease; }
+        .nav-item a:hover { background: #e6f7ff; color: #1890ff; }
+        .nav-item a.active { background: #e6f7ff; color: #1890ff; font-weight: 500; position: relative; }
+        .nav-item a.active::before { content: ''; position: absolute; left: 0; width: 3px; height: 24px; background: #1890ff; border-radius: 0 2px 2px 0; }
+        .nav-item .icon { font-size: 18px; width: 22px; text-align: center; opacity: 0.7; }
+        .nav-item a:hover .icon, .nav-item a.active .icon { opacity: 1; }
+        .nav-item .arrow { margin-left: auto; font-size: 12px; opacity: 0.5; }
+        
+        .main-content { flex: 1; margin-left: 240px; display: flex; flex-direction: column; }
+        .topbar { background: #fff; padding: 15px 25px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .topbar-left { display: flex; align-items: center; gap: 15px; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #666; }
+        .breadcrumb a { color: #1890ff; text-decoration: none; }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .topbar-right { display: flex; align-items: center; gap: 15px; }
+        .user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #666; }
+        .page-content { padding: 24px; flex: 1; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin-bottom: 20px; overflow: hidden; }
+        .card-header { padding: 15px 20px; border-bottom: 1px solid #e8e8e8; display: flex; justify-content: space-between; align-items: center; background: #fafafa; }
+        .card-header h2 { margin: 0; font-size: 16px; font-weight: 600; color: #1f1f1f; display: flex; align-items: center; gap: 8px; }
+        .card-body { padding: 20px; }
+        
+        /* 按钮样式 */
+        .btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; background: #1890ff; color: #fff; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 13px; transition: all 0.2s; }
+        .btn:hover { background: #096dd9; }
+        .btn-success { background: #52c41a; }
+        .btn-success:hover { background: #389e0d; }
+        .btn-danger { background: #ff4d4f; }
+        .btn-danger:hover { background: #cf1322; }
+        .btn-secondary { background: #fff; color: #595959; border: 1px solid #d9d9d9; }
+        .btn-secondary:hover { border-color: #1890ff; color: #1890ff; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        
+        /* 表格样式 */
+        table { width: 100%; border-collapse: collapse; background: #fff; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e8e8e8; }
+        th { background: #fafafa; font-weight: 600; color: #666; font-size: 13px; }
+        tr:hover { background: #fafafa; }
+        tr:last-child td { border-bottom: none; }
+        .table-responsive { overflow-x: auto; }
+        
+        /* 徽章样式 */
+        .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-success { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .badge-warning { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+        .badge-danger { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
+        .badge-info { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+        .badge-default { background: #f5f5f5; color: #666; }
+        
+        /* 搜索框 */
+        .search-box { display: flex; gap: 10px; flex-wrap: wrap; padding: 15px; background: #fafafa; border-radius: 8px; margin-bottom: 20px; align-items: flex-end; }
+        .search-box .form-group { margin: 0; flex: 1; min-width: 150px; }
+        .search-box label { display: block; margin-bottom: 5px; font-size: 12px; color: #666; font-weight: 500; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; transition: border-color 0.2s; }
+        .form-control:focus { border-color: #1890ff; outline: none; box-shadow: 0 0 0 3px rgba(24,144,255,0.1); }
+        select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 35px; }
+        
+        /* 分页 */
+        .pagination { display: flex; justify-content: center; padding: 20px 0; gap: 5px; }
+        .pagination a, .pagination span { padding: 8px 14px; border: 1px solid #d9d9d9; border-radius: 6px; text-decoration: none; color: #666; transition: all 0.2s; }
+        .pagination a:hover { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .pagination .active { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .pagination .disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* 提示框 */
+        .alert { padding: 12px 20px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .alert-success { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .alert-danger { background: #fff2f0; color: #cf1322; border: 1px solid #ffccc7; }
+        .alert-warning { background: #fff7e6; color: #fa8c16; border: 1px solid #ffd591; }
+        
+        /* 统计卡片 */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 15px; }
+        .stat-icon { width: 50px; height: 50px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .stat-info h3 { margin: 0; font-size: 28px; font-weight: 700; color: #1f1f1f; }
+        .stat-info p { margin: 5px 0 0 0; color: #8c8c8c; font-size: 13px; }
+        
+        /* 详情网格 */
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+        .detail-item { padding: 15px; background: #fafafa; border-radius: 6px; }
+        .detail-item label { display: block; font-size: 12px; color: #8c8c8c; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .detail-item span { font-size: 14px; color: #1f1f1f; font-weight: 500; }
+        
+        /* 表单 */
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #666; font-size: 13px; }
+        textarea.form-control { min-height: 100px; resize: vertical; }
+        
+        /* 文件上传 */
+        .file-upload { border: 2px dashed #d9d9d9; border-radius: 8px; padding: 30px; text-align: center; background: #fafafa; }
+        .file-upload:hover { border-color: #1890ff; background: #e6f7ff; }
+        .file-upload input[type="file"] { margin: 10px 0; }
+        
+        .text-center { text-align: center; }
+        .actions { display: flex; gap: 5px; }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; }
+            .sidebar-header h1 span, .sidebar-header .subtitle, .nav-item a span:not(.icon), .nav-section-title { display: none; }
+            .nav-item a { padding: 11px; justify-content: center; }
+            .main-content { margin-left: 60px; }
+            .topbar { padding: 12px 15px; }
+            .page-content { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-server"></i> 资产管理系统</h1>
+                <div class="subtitle">Asset Management</div>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">概况</div>
+                    <div class="nav-item">
+                        <a href="{% url 'cmdb_index' %}" {% if request.path == '/cmdb/' or request.path == '/cmdb' %}class="active"{% endif %}>
+                            <i class="icon fas fa-chart-line"></i>
+                            <span>首页</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">资产管理</div>
+                    {% if request.user|has_module_permission:'asset' %}
+                    <div class="nav-item">
+                        <a href="{% url 'asset_list' %}" {% if '/cmdb/assets' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-desktop"></i>
+                            <span>动态资产</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'static_asset' %}
+                    <div class="nav-item">
+                        <a href="{% url 'static_asset_list' %}" {% if '/cmdb/static/assets' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-box"></i>
+                            <span>静态资产</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'cabinet' %}
+                    <div class="nav-item">
+                        <a href="{% url 'cabinet_layout' %}" {% if '/cmdb/cabinet/layout' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-th-large"></i>
+                            <span>机柜布局图</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'idc' %}
+                    <div class="nav-item">
+                        <a href="{% url 'idc_list' %}" {% if '/cmdb/idc' in request.path and 'add' not in request.path and 'edit' not in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-building"></i>
+                            <span>机房管理</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'cabinet' %}
+                    <div class="nav-item">
+                        <a href="{% url 'cabinet_list' %}" {% if '/cmdb/cabinet' in request.path and 'add' not in request.path and 'edit' not in request.path and 'layout' not in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-archive"></i>
+                            <span>机柜管理</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'group' %}
+                    <div class="nav-item">
+                        <a href="{% url 'group_list' %}" {% if '/cmdb/group' in request.path and 'add' not in request.path and 'edit' not in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-layer-group"></i>
+                            <span>动态资产组</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">硬件采集</div>
+                    {% if request.user|has_module_permission:'bastion' %}
+                    <div class="nav-item">
+                        <a href="{% url 'bastion_list' %}" {% if '/cmdb/bastion' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-desktop"></i>
+                            <span>跳板机</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'server' %}
+                    <div class="nav-item">
+                        <a href="{% url 'target_server_list' %}" {% if '/cmdb/server' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-lock"></i>
+                            <span>目标服务器</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if request.user|has_module_permission:'collect' %}
+                    <div class="nav-item">
+                        <a href="{% url 'collect_task_list' %}" {% if '/cmdb/collect' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-radio"></i>
+                            <span>采集任务</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="nav-section">
+                    <div class="nav-section-title">数据管理</div>
+                    {% if request.user|has_module_permission:'backup' %}
+                    <div class="nav-item">
+                        <a href="{% url 'backup_list' %}" {% if '/cmdb/backup' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-archive"></i>
+                            <span>数据备份</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if user.is_superuser %}
+                <div class="nav-section">
+                    <div class="nav-section-title">系统设置</div>
+                    <div class="nav-item">
+                        <a href="{% url 'user_management' %}" {% if '/cmdb/settings' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-cog"></i>
+                            <span>系统设置</span>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </nav>
+        </aside>
+        <main class="main-content">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <div class="breadcrumb">
+                        <a href="{% url 'cmdb_index' %}">首页</a>
+                        {% if request.path != '/cmdb/' and request.path != '/cmdb' %}
+                        <span>/</span>
+                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% endif %}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="topbar-right">
+                    {% if request.user.is_authenticated %}
+                    <div class="user-menu" style="position: relative;">
+                        <a href="#" onclick="toggleUserMenu()" style="display: flex; align-items: center; gap: 8px; color: #666; text-decoration: none; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;">
+                            <i class="fas fa-user-circle" style="font-size: 18px;"></i>
+                            <span style="font-weight: 500;">{{ request.user.username }}</span>
+                            <i class="fas fa-chevron-down" style="font-size: 12px;"></i>
+                        </a>
+                        <div id="userDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000; margin-top: 5px; overflow: hidden; border: 1px solid #e8e8e8;">
+                            {% if request.user.is_superuser %}
+                            <a href="{% url 'user_management' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #666; text-decoration: none; transition: background 0.2s;">
+                                <i class="fas fa-cog"></i> 系统设置
+                            </a>
+                            {% endif %}
+                            <a href="{% url 'change_password' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #666; text-decoration: none; transition: background 0.2s;">
+                                <i class="fas fa-key"></i> 修改密码
+                            </a>
+                            <a href="{% url 'logout' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #ff4d4f; text-decoration: none; transition: background 0.2s;">
+                                <i class="fas fa-sign-out-alt"></i> 退出登录
+                            </a>
+                        </div>
+                    </div>
+                    {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-sm">登录</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="page-content">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">
+                            {% if message.tags == 'success' %}<i class="fas fa-check-circle"></i>{% elif message.tags == 'danger' %}<i class="fas fa-times-circle"></i>{% elif message.tags == 'warning' %}<i class="fas fa-exclamation-circle"></i>{% endif %}
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleUserMenu() {
+            var dropdown = document.getElementById('userDropdown');
+            if (dropdown.style.display === 'none') {
+                dropdown.style.display = 'block';
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            var dropdown = document.getElementById('userDropdown');
+            var userMenu = document.querySelector('.user-menu');
+            if (dropdown && userMenu && !userMenu.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

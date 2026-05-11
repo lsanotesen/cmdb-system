@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}静态资产列表 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📋 静态资产列表</h2>
+        <div class="btn-group">
+            <a href="{% url 'static_asset_add' %}" class="btn btn-success">➕ 添加静态资产</a>
+            <a href="{% url 'static_asset_import' %}" class="btn">📥 Excel导入</a>
+            <a href="{% url 'export_static_assets_excel' %}" class="btn">📊 Excel导出</a>
+            <a href="{% url 'export_static_assets_csv' %}" class="btn btn-secondary">📄 CSV导出</a>
+            <button id="batch-delete" class="btn btn-danger" onclick="batchDelete()">🗑️ 批量删除</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="search-box">
+            <div class="form-group">
+                <label>关键词搜索</label>
+                <input type="text" name="keyword" value="{{ keyword|default:'' }}" placeholder="资产编号/机柜/部门/IP/联系人/品牌型号" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>机柜</label>
+                <select name="cabinet" class="form-control">
+                    <option value="">全部机柜</option>
+                    {% for cabinet in cabinet_list %}
+                    <option value="{{ cabinet }}" {% if cabinet_filter == cabinet %}selected{% endif %}>{{ cabinet }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>使用部门/团队</label>
+                <select name="department" class="form-control">
+                    <option value="">全部部门</option>
+                    {% for department in department_list %}
+                    <option value="{{ department }}" {% if department_filter == department %}selected{% endif %}>{{ department }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>服务器类型</label>
+                <select name="server_type" class="form-control">
+                    <option value="">全部类型</option>
+                    {% for server_type in server_type_list %}
+                    <option value="{{ server_type }}" {% if server_type_filter == server_type %}selected{% endif %}>{{ server_type }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>状态</label>
+                <select name="status" class="form-control">
+                    <option value="">全部状态</option>
+                    {% for status in status_list %}
+                    <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0;">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn">🔍 搜索</button>
+                <a href="{% url 'static_asset_list' %}" class="btn btn-secondary">重置</a>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all" onclick="selectAll()"></th>
+                        <th>序号</th>
+                        <th>服务器资产编号</th>
+                        <th>机柜</th>
+                        <th>开始U数</th>
+                        <th>结束U数</th>
+                        <th>使用部门/团队（负责人）</th>
+                        <th>服务器类型</th>
+                        <th>IP地址</th>
+                        <th>联系人/责任人/使用人</th>
+                        <th>服务器品牌型号</th>
+                        <th>服务器机型（CPU/GPU卡型数量）</th>
+                        <th>服务器额定功率</th>
+                        <th>备注</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr>
+                        <td><input type="checkbox" class="asset-checkbox" value="{{ asset.id }}"></td>
+                        <td>{{ asset.serial_number|default:'-' }}</td>
+                        <td><strong>{{ asset.asset_no|default:'-' }}</strong></td>
+                        <td>{{ asset.cabinet|default:'-' }}</td>
+                        <td>{{ asset.start_u|default:'-' }}</td>
+                        <td>{{ asset.end_u|default:'-' }}</td>
+                        <td>{{ asset.department|default:'-' }}</td>
+                        <td>{{ asset.server_type|default:'-' }}</td>
+                        <td>{{ asset.ip|default:'-' }}</td>
+                        <td>{{ asset.contact_person|default:'-' }}</td>
+                        <td>{{ asset.device_model|default:'-' }}</td>
+                        <td>{{ asset.server_model|default:'-' }}</td>
+                        <td>{{ asset.power_rating|default:'-' }}</td>
+                        <td>{{ asset.memo|default:'-'|truncatewords:3 }}</td>
+                        <td>{{ asset.status|default:'-' }}</td>
+                        <td class="actions">
+                            <a href="{% url 'static_asset_edit' asset.id %}" class="btn btn-sm">编辑</a>
+                            <a href="{% url 'static_asset_delete' asset.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除静态资产 {{ asset.asset_no }}?')">删除</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="16" class="text-center">暂无静态资产数据，请 <a href="{% url 'static_asset_add' %}">添加静态资产</a> 或 <a href="{% url 'static_asset_import' %}">导入Excel</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if assets.has_other_pages %}
+        <div class="pagination">
+            {% if assets.has_previous %}
+            <a href="?page={{ assets.previous_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}">上一页</a>
+            {% else %}
+            <span class="disabled">上一页</span>
+            {% endif %}
+            <span>第 {{ assets.number }} / {{ assets.paginator.num_pages }} 页</span>
+            {% if assets.has_next %}
+            <a href="?page={{ assets.next_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}">下一页</a>
+            {% else %}
+            <span class="disabled">下一页</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// 全选/取消全选
+function selectAll() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const assetCheckboxes = document.querySelectorAll('.asset-checkbox');
+    assetCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+}
+
+// 批量删除
+function batchDelete() {
+    const selectedCheckboxes = document.querySelectorAll('.asset-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        alert('请选择要删除的静态资产');
+        return;
+    }
+    
+    if (!confirm('确定要删除选中的 ' + selectedCheckboxes.length + ' 个静态资产吗？')) {
+        return;
+    }
+    
+    const selectedIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.value);
+    
+    // 发送POST请求删除选中的静态资产
+    fetch('{% url "static_asset_batch_delete" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ ids: selectedIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('批量删除成功');
+            window.location.reload();
+        } else {
+            alert('批量删除失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('批量删除失败:', error);
+        alert('批量删除时发生错误');
+    });
+}
+</script>
+{% endblock %}

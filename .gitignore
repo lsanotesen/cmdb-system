@@ -1,0 +1,39 @@
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Django specific
+*.log
+*.pot
+db.sqlite3
+media/
+local_settings.py
+.env
+.env.*
+
+# Backup files
+backup/
+*.sql
+*.sql.gz
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+.trae/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

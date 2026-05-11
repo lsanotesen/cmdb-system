@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}系统设置 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2 style="margin: 0; font-size: 24px; font-weight: 600; color: #2d3748;">⚙️ 系统设置</h2>
+</div>
+
+<div class="settings-container" style="display: grid; grid-template-columns: 250px 1fr; gap: 25px;">
+    <div class="settings-nav" style="background: white; border-radius: 8px; padding: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+        <div class="nav-section">
+            <div class="nav-item {% if active_tab == 'users' %}active{% endif %}" style="margin: 5px 0;">
+                <a href="{% url 'user_management' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: {% if active_tab == 'users' %}#667eea{% else %}#a0aec0{% endif %}; text-decoration: none; border-radius: 8px; transition: all 0.3s;">
+                    <span style="font-size: 18px;">👥</span>
+                    <span>用户管理</span>
+                </a>
+            </div>
+            <div class="nav-item {% if active_tab == 'permissions' %}active{% endif %}" style="margin: 5px 0;">
+                <a href="{% url 'permission_management' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: {% if active_tab == 'permissions' %}#667eea{% else %}#a0aec0{% endif %}; text-decoration: none; border-radius: 8px; transition: all 0.3s;">
+                    <span style="font-size: 18px;">🔐</span>
+                    <span>权限管理</span>
+                </a>
+            </div>
+            <div class="nav-item {% if active_tab == 'roles' %}active{% endif %}" style="margin: 5px 0;">
+                <a href="{% url 'role_management' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 15px; color: {% if active_tab == 'roles' %}#667eea{% else %}#a0aec0{% endif %}; text-decoration: none; border-radius: 8px; transition: all 0.3s;">
+                    <span style="font-size: 18px;">🎭</span>
+                    <span>角色管理</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-content">
+        {% block settings_content %}
+        <div class="card">
+            <div class="card-header">
+                <h2>👥 用户管理</h2>
+                <a href="{% url 'user_add' %}" class="btn btn-primary">+ 添加用户</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户名</th>
+                                <th>邮箱</th>
+                                <th>真实姓名</th>
+                                <th>角色</th>
+                                <th>状态</th>
+                                <th>最后登录</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td><strong>{{ user.username }}</strong></td>
+                                <td>{{ user.email|default:"-" }}</td>
+                                <td>{{ user.userprofile.real_name|default:"-" }}</td>
+                                <td>
+                                    {% if user.userprofile.role %}
+                                        <span class="badge badge-info">{{ user.userprofile.role.name }}</span>
+                                    {% else %}
+                                        <span class="badge badge-default">未分配</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if user.is_active %}
+                                        <span class="badge badge-success">启用</span>
+                                    {% else %}
+                                        <span class="badge badge-danger">禁用</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.last_login|date:"Y-m-d H:i"|default:"从未" }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{% url 'user_edit' user.id %}" class="btn btn-sm btn-secondary">编辑</a>
+                                        {% if user.id != request.user.id %}
+                                            <a href="{% url 'user_permissions' user.id %}" class="btn btn-sm btn-info">权限</a>
+                                            {% if user.is_active %}
+                                                <a href="{% url 'user_disable' user.id %}" class="btn btn-sm btn-warning" onclick="return confirm('确定要禁用该用户吗？')">禁用</a>
+                                            {% else %}
+                                                <a href="{% url 'user_enable' user.id %}" class="btn btn-sm btn-success">启用</a>
+                                            {% endif %}
+                                            <a href="{% url 'user_delete' user.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定要删除该用户吗？此操作不可撤销！')">删除</a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center" style="padding: 40px; color: #718096;">
+                                    暂无用户数据
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endblock %}
+    </div>
+</div>
+{% endblock %}

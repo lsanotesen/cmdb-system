@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}主机列表 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>🖥️ 主机列表</h2>
+        <div class="btn-group">
+            <a href="{% url 'host_add' %}" class="btn btn-success">➕ 添加主机</a>
+            <a href="{% url 'host_import' %}" class="btn">📥 Excel导入</a>
+            <a href="{% url 'export_hosts_excel' %}" class="btn">📊 Excel导出</a>
+            <a href="{% url 'export_hosts_csv' %}" class="btn btn-secondary">📄 CSV导出</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="search-box">
+            <div class="form-group">
+                <label>关键词搜索</label>
+                <input type="text" name="keyword" value="{{ keyword|default:'' }}" placeholder="主机名/资产编号/IP/部门/联系人/SN" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>所属机房</label>
+                <select name="idc_id" class="form-control">
+                    <option value="">全部机房</option>
+                    {% for idc in idc_list %}
+                    <option value="{{ idc.id }}" {% if idc_id == idc.id|stringformat:"s" %}selected{% endif %}>{{ idc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>设备类型</label>
+                <select name="asset_type" class="form-control">
+                    <option value="">全部类型</option>
+                    {% for value, name in asset_types %}
+                    <option value="{{ value }}" {% if asset_type == value %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>设备状态</label>
+                <select name="status" class="form-control">
+                    <option value="">全部状态</option>
+                    {% for value, name in asset_status %}
+                    <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex: 0;">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn">🔍 搜索</button>
+                <a href="{% url 'host_list' %}" class="btn btn-secondary">重置</a>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>主机名</th>
+                        <th>资产编号</th>
+                        <th>机柜位置</th>
+                        <th>部门/团队</th>
+                        <th>设备类型</th>
+                        <th>IP地址</th>
+                        <th>联系人</th>
+                        <th>品牌型号</th>
+                        <th>CPU</th>
+                        <th>GPU</th>
+                        <th>内存</th>
+                        <th>硬盘</th>
+                        <th>操作系统</th>
+                        <th>序列号</th>
+                        <th>带外IP</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.asset_no|default:'-' }}</td>
+                        <td>{{ host.cabinet_position|default:'-' }}</td>
+                        <td>{{ host.department|default:'-' }}</td>
+                        <td>
+                            {% if host.asset_type == '1' %}<span class="badge badge-info">物理机</span>
+                            {% elif host.asset_type == '2' %}<span class="badge badge-default">虚拟机</span>
+                            {% elif host.asset_type == '3' %}<span class="badge badge-warning">容器</span>
+                            {% elif host.asset_type == '4' %}<span class="badge badge-success">网络设备</span>
+                            {% elif host.asset_type == '5' %}<span class="badge badge-danger">安全设备</span>
+                            {% else %}<span class="badge badge-default">其他</span>{% endif %}
+                        </td>
+                        <td><code>{{ host.ip }}</code></td>
+                        <td>{{ host.responsible_person|default:'-' }}</td>
+                        <td>{{ host.device_model|default:'-' }}</td>
+                        <td>{{ host.cpu_model|default:'-' }}{{ host.cpu_num|default:'' }}</td>
+                        <td>{{ host.gpu_model|default:'-' }}{{ host.gpu_num|default:'' }}</td>
+                        <td>{{ host.memory|default:'-' }}</td>
+                        <td>{{ host.disk|default:'-' }}</td>
+                        <td>{{ host.os|default:'-' }}</td>
+                        <td><code>{{ host.sn|default:'-' }}</code></td>
+                        <td><code>{{ host.bm_ip|default:'-' }}</code></td>
+                        <td class="actions">
+                            <a href="{% url 'host_detail' host.id %}" class="btn btn-sm">详情</a>
+                            <a href="{% url 'host_edit' host.id %}" class="btn btn-sm">编辑</a>
+                            <a href="{% url 'host_delete' host.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除主机 {{ host.hostname }}?')">删除</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="16" class="text-center">暂无主机数据，请 <a href="{% url 'host_add' %}">添加主机</a> 或 <a href="{% url 'host_import' %}">导入Excel</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if hosts.has_other_pages %}
+        <div class="pagination">
+            {% if hosts.has_previous %}
+            <a href="?page={{ hosts.previous_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if idc_id %}&idc_id={{ idc_id }}{% endif %}{% if asset_type %}&asset_type={{ asset_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">上一页</a>
+            {% else %}
+            <span class="disabled">上一页</span>
+            {% endif %}
+            <span>第 {{ hosts.number }} / {{ hosts.paginator.num_pages }} 页</span>
+            {% if hosts.has_next %}
+            <a href="?page={{ hosts.next_page_number }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if idc_id %}&idc_id={{ idc_id }}{% endif %}{% if asset_type %}&asset_type={{ asset_type }}{% endif %}{% if status %}&status={{ status }}{% endif %}">下一页</a>
+            {% else %}
+            <span class="disabled">下一页</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

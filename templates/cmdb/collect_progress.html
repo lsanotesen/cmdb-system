@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}采集进度 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📡 采集任务执行进度</h2>
+        <div class="btn-group">
+            <a href="{% url 'collect_task_list' %}" class="btn btn-secondary">← 返回任务列表</a>
+            <a href="{% url 'collect_history' %}" class="btn">📋 查看历史记录</a>
+            <a href="{% url 'restart_collect_task' task.id %}" class="btn btn-primary">🔄 重新执行</a>
+            <button id="stop-task" class="btn btn-danger">⏹️ 停止任务</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="stats-grid" style="margin-bottom: 25px;">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📊</div>
+                <div class="stat-info">
+                    <h3>{{ task.name }}</h3>
+                    <p>采集任务</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f39c12 0%, #d68910 100%); color: white;">⏱️</div>
+                <div class="stat-info">
+                    <h3>{% now "Y-m-d H:i:s" %}</h3>
+                    <p>开始时间</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white;">📈</div>
+                <div class="stat-info">
+                    <h3 id="completed-count">0</h3>
+                    <p>已完成</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">✓</div>
+                <div class="stat-info">
+                    <h3 id="success-count">0</h3>
+                    <p>成功</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%); color: white;">✗</div>
+                <div class="stat-info">
+                    <h3 id="failed-count">0</h3>
+                    <p>失败</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="progress" style="height: 20px; margin-bottom: 20px;">
+            <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="{{ total_hosts }}">
+                0/{{ total_hosts }}
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="results-table">
+                <thead>
+                    <tr>
+                        <th>IP地址</th>
+                        <th>主机名</th>
+                        <th>状态</th>
+                        <th>错误信息</th>
+                    </tr>
+                </thead>
+                <tbody id="results-body">
+                    <tr>
+                        <td colspan="4" class="text-center" style="padding: 40px;">
+                            <p style="color: #718096; margin: 0;">采集任务正在执行中，请稍候...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 定时获取进度数据
+    function updateProgress() {
+        fetch('{% url 'collect_task_progress' progress_file %}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    return;
+                }
+
+                // 更新进度条
+                const progress = data.completed / data.total * 100;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                document.getElementById('progress-bar').textContent = `${data.completed}/${data.total}`;
+                document.getElementById('progress-bar').setAttribute('aria-valuenow', data.completed);
+
+                // 更新统计信息
+                document.getElementById('completed-count').textContent = data.completed;
+                document.getElementById('success-count').textContent = data.success;
+                document.getElementById('failed-count').textContent = data.failed;
+
+                // 更新结果表格
+                const resultsBody = document.getElementById('results-body');
+                if (data.results.length > 0) {
+                    resultsBody.innerHTML = '';
+                    data.results.forEach(result => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><code>${result.ip}</code></td>
+                            <td>${result.hostname || '-'}</td>
+                            <td>
+                                ${result.status === 'success' ? 
+                                    '<span class="badge badge-success">成功</span>' : 
+                                    '<span class="badge badge-danger">失败</span>'
+                                }
+                            </td>
+                            <td>
+                                ${result.error ? 
+                                    `<span style="color: #e53e3e; font-size: 12px;">${result.error}</span>` : 
+                                    '-'}
+                            </td>
+                        `;
+                        resultsBody.appendChild(row);
+                    });
+                }
+
+                // 如果任务完成，停止定时更新
+                if (data.finished) {
+                    clearInterval(interval);
+                    // 添加完成提示
+                    const cardBody = document.querySelector('.card-body');
+                    const completionMessage = document.createElement('div');
+                    completionMessage.className = 'alert alert-success';
+                    completionMessage.style.marginTop = '20px';
+                    completionMessage.textContent = '采集任务已完成！';
+                    cardBody.appendChild(completionMessage);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    // 每1秒更新一次进度
+    const interval = setInterval(updateProgress, 1000);
+    
+    // 初始加载
+    updateProgress();
+
+    // 停止任务按钮点击事件
+    document.getElementById('stop-task').addEventListener('click', function() {
+        if (confirm('确定要停止采集任务吗？')) {
+            fetch('{% url 'stop_collect_task' task.id %}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('任务已成功停止');
+                        // 不刷新页面，让进度更新函数继续运行直到任务真正停止
+                    } else {
+                        alert('停止任务失败：' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('停止任务失败:', error);
+                    alert('停止任务时发生错误');
+                });
+        }
+    });
+</script>
+
+<style>
+    .progress {
+        margin: 20px 0;
+    }
+    .progress-bar {
+        font-size: 14px;
+        line-height: 20px;
+    }
+</style>
+{% endblock %}

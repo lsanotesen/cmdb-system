@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: cmdb-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cmdb
+      MYSQL_USER: cmdb
+      MYSQL_PASSWORD: cmdb123
+      MYSQL_ROOT_HOST: '%'
+    volumes:
+      - /data01/mysql_data:/var/lib/mysql
+    ports:
+      - "3308:3306"
+    networks:
+      - cmdb-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u cmdb -pcmdb123 || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 15
+      start_period: 20s
+
+  cmdb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cmdb-app
+    restart: always
+    ports:
+      - "8001:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=cmdb
+      - DB_PASSWORD=cmdb123
+      - DB_NAME=cmdb
+    volumes:
+      - .:/app
+      - /data01/db_backup:/data01/db_backup
+    command: ["sh", "-c", "chmod +x start.sh && ./start.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - cmdb-network
+
+networks:
+  cmdb-network:
+    driver: bridge

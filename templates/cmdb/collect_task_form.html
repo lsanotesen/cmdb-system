@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if action == 'add' %}新建采集任务{% else %}编辑采集任务{% endif %} - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>{% if action == 'add' %}➕ 新建采集任务{% else %}✏️ 编辑采集任务{% endif %}</h2>
+        <div class="btn-group">
+            <a href="{% url 'collect_task_list' %}" class="btn btn-secondary">← 返回列表</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" style="max-width: 900px;">
+            {% csrf_token %}
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>任务名称 *</label>
+                    <input type="text" name="name" class="form-control" required value="{{ task.name|default:'' }}" placeholder="如: 每日凌晨采集">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>跳板机</label>
+                    <select name="bastion" class="form-control">
+                        <option value="">-- 直连（不通过跳板机）--</option>
+                        {% for b in bastions %}
+                        <option value="{{ b.id }}" {% if task.bastion_id == b.id %}selected{% endif %}>{{ b.name }} ({{ b.host }})</option>
+                        {% endfor %}
+                    </select>
+                    <small style="color: #718096;">留空则直连目标服务器</small>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>目标主机 *</label>
+                <input type="text" name="target_hosts" class="form-control" required value="{{ task.target_hosts|default:'' }}" placeholder="192.168.1.1-254 或 192.168.1.1,192.168.1.2">
+                <small style="color: #718096;">支持格式: 192.168.1.1-254 (IP范围) 或多个IP用逗号分隔。目标主机的认证信息请在目标服务器中设置。</small>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">采集选项</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="collect_online_only" {% if task.collect_online_only or action == 'add' %}checked{% endif %}>
+                            仅采集在线主机（采集前先检查SSH端口是否可达）
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="jump_via_bastion" {% if task.jump_via_bastion %}checked{% endif %}>
+                            通过跳板机免密跳转（跳板机需已配置SSH密钥交换，可免密登录目标；不勾选则读取目标服务器的密码）
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="is_enabled" {% if task.is_enabled or action == 'add' %}checked{% endif %}>
+                            启用该任务
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">选择性更新字段</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label style="color: #718096; font-size: 12px;">勾选要更新的字段（未勾选的字段将保留原值）：</label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_hostname" {% if task.update_hostname or action == 'add' %}checked{% endif %}>
+                            更新主机名 (hostname)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_os" {% if task.update_os or action == 'add' %}checked{% endif %}>
+                            更新操作系统 (OS)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_cpu" {% if task.update_cpu or action == 'add' %}checked{% endif %}>
+                            更新CPU信息 (cpu_model, cpu_num)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_memory" {% if task.update_memory or action == 'add' %}checked{% endif %}>
+                            更新内存 (memory)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_disk" {% if task.update_disk %}checked{% endif %}>
+                            更新硬盘 (disk) <span style="color: #e53e3e;">（默认不勾选，RAID环境下不准确）</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_gpu" {% if task.update_gpu or action == 'add' %}checked{% endif %}>
+                            更新GPU信息 (gpu_model, gpu_num)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_device_info" {% if task.update_device_info or action == 'add' %}checked{% endif %}>
+                            更新设备信息 (device_model)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="update_sn" {% if task.update_sn or action == 'add' %}checked{% endif %}>
+                            更新序列号 (SN)
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+                <div class="card-header" style="background: #f7fafc;">
+                    <h3 style="margin: 0; font-size: 14px;">定时采集（可选）</h3>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="is_auto_collect" {% if task.is_auto_collect %}checked{% endif %} id="auto_collect_checkbox">
+                            启用定时自动采集
+                        </label>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cron表达式</label>
+                            <input type="text" name="cron_expression" class="form-control" id="cron_input" value="{{ task.cron_expression|default:'0 2 * * *' }}" placeholder="分 时 日 月 周">
+                            <small style="color: #718096;">
+                                示例: <code>0 2 * * *</code> 每天凌晨2点 | <code>0 */4 * * *</code> 每4小时 | <code>0 9 * * 1-5</code> 工作日上午9点
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="memo" class="form-control" rows="3" placeholder="备注信息">{{ task.memo|default:'' }}</textarea>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <button type="submit" class="btn btn-success" style="padding: 12px 40px;">
+                    {% if action == 'add' %}➕ 创建任务{% else %}💾 保存修改{% endif %}
+                </button>
+                {% if action == 'edit' %}
+                <a href="{% url 'run_collect_task' task.id %}" class="btn btn-success" style="padding: 12px 40px;">▶️ 立即执行</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

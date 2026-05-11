@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}导入目标服务器 - 资产管理系统{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📥 批量导入目标服务器</h2>
+        <div class="btn-group">
+            <a href="{% url 'target_server_list' %}" class="btn btn-secondary">← 返回列表</a>
+            <a href="{% url 'export_target_server' %}" class="btn">📊 下载模板</a>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="form-row" style="margin-bottom: 20px;">
+            <div class="file-upload" style="flex: 1;">
+                <h3 style="margin: 0 0 15px 0; color: #4a5568;">📁 选择Excel文件</h3>
+                <form method="post" enctype="multipart/form-data" style="margin: 0;">
+                    {% csrf_token %}
+                    <input type="file" name="excel_file" accept=".xlsx,.xls" required class="form-control" style="display: inline-block; width: auto;">
+                    <div style="margin-top: 15px;">
+                        <button type="submit" class="btn btn-success" style="padding: 12px 30px; font-size: 14px;">🚀 开始导入</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card" style="box-shadow: none; border: 1px solid #e2e8f0;">
+            <div class="card-header" style="background: #f7fafc;">
+                <h3 style="margin: 0; font-size: 14px;">📊 Excel表头格式</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table style="font-size: 12px;">
+                        <thead>
+                            <tr>
+                                <th>配置名称</th>
+                                <th>目标服务器IP</th>
+                                <th>端口</th>
+                                <th>用户名</th>
+                                <th>密码</th>
+                                <th>采集资产类型</th>
+                                <th>启用状态</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>服务器-192.168.1.1</code></td>
+                                <td><code>192.168.1.1</code></td>
+                                <td><code>22</code></td>
+                                <td><code>root</code></td>
+                                <td><code>password123</code></td>
+                                <td><code>物理机</code></td>
+                                <td><code>是</code></td>
+                                <td><code>备注信息</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 15px; padding: 15px; background: #fffbeb; border-radius: 6px; font-size: 13px;">
+                    <strong>📌 说明：</strong>
+                    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                        <li>配置名称、目标服务器IP 为必填项</li>
+                        <li>端口默认22，可不填</li>
+                        <li>用户名默认root，可不填</li>
+                        <li>采集资产类型可选: <code>物理机</code>、<code>物理机+虚拟机</code>、<code>物理机+虚拟机+容器</code>、<code>全部</code></li>
+                        <li>启用状态填 <code>是</code> 或 <code>否</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

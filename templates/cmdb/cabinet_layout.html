@@ -1,0 +1,493 @@
+{% extends 'base.html' %}
+
+{% block title %}机柜布局图{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h2>🗃️ 机柜布局图</h2>
+        <div class="actions">
+            <button id="refreshBtn" class="btn">🔄 刷新</button>
+            <button onclick="exportToExcel()" class="btn">📊 导出Excel</button>
+            <button onclick="exportToHTML()" class="btn">📄 导出HTML</button>
+            <button onclick="exportToImage()" class="btn">🖼️ 导出图片</button>
+            <span id="refreshStatus"></span>
+        </div>
+    </div>
+    <div id="cabinets-root" class="cabinets-grid"></div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script>
+let allAssets = [];
+let fetchCount = 0;
+
+async function fetchAssets() {
+    fetchCount++;
+    console.log(`=== 第${fetchCount}次请求数据 ===`);
+    try {
+        const response = await fetch('/cmdb/api/assets/?t=' + new Date().getTime());
+        const data = await response.json();
+        console.log(`接收到 ${data.length} 条记录`);
+        
+        const count = data.filter(a => a.ip === '192.168.10.232').length;
+        console.log(`192.168.10.232 的数量: ${count}`);
+        
+        return data;
+    } catch (err) {
+        console.error(err);
+        return [];
+    }
+}
+
+function renderAllCabinets(assets) {
+    console.log(`=== 渲染开始，资产数量: ${assets.length} ===`);
+    allAssets = assets;
+    const groups = {};
+    
+    for (const asset of assets) {
+        const cabinet = asset.cabinet && asset.cabinet.trim ? asset.cabinet.trim() : asset.cabinet;
+        if (!groups[cabinet]) groups[cabinet] = [];
+        groups[cabinet].push(asset);
+    }
+
+    const root = document.getElementById('cabinets-root');
+    if (Object.keys(groups).length === 0) {
+        root.innerHTML = '<div class="empty">暂无机柜数据</div>';
+        return;
+    }
+
+    const cabinetNames = Object.keys(groups).sort();
+    let html = '';
+
+    for (const cabinetName of cabinetNames) {
+        const assetList = groups[cabinetName];
+        console.log(`处理机柜 ${cabinetName}，设备数量: ${assetList.length}`);
+        
+        const assetMap = new Map();
+
+        for (const asset of assetList) {
+            const start = parseInt(asset.start_u);
+            const end = parseInt(asset.end_u);
+            
+            console.log(`处理资产: asset_no=${asset.asset_no}, ip=${asset.ip}, start_u=${asset.start_u}, end_u=${asset.end_u}, 转换后start=${start}, end=${end}`);
+            
+            if (isNaN(start) || isNaN(end) || start < 1 || end > 42 || start > end) continue;
+            
+            const key = asset.asset_no || `${asset.ip}-${start}-${end}` || `device-${Date.now()}-${Math.random()}`;
+            if (!assetMap.has(key)) {
+                assetMap.set(key, { asset, start, end });
+                console.log(`  -> 新增到assetMap`);
+            } else {
+                console.log(`  -> 跳过重复资产`);
+            }
+        }
+
+        const uMap = new Map();
+        for (const { asset, start, end } of assetMap.values()) {
+            const key = `${end}-${asset.asset_no}-${asset.ip}`;
+            uMap.set(key, { asset, start, end, originalEnd: end });
+            console.log(`设备 ${asset.asset_no || asset.ip}: start=${start}, end=${end}, span=${end-start+1}, 存储在U${end}`);
+        }
+        
+        console.log('=== uMap 内容 ===');
+        for (const [key, value] of uMap.entries()) {
+            console.log(`  U${key}: ${value.asset.ip} (${value.start}-${value.end})`);
+        }
+
+        html += `
+            <div class="cabinet">
+                <div class="cabinet-title">${cabinetName}</div>
+                <table class="rack-table">
+                    <thead><tr><th>U位</th><th>设备</th><th>IP</th><th>功率</th></tr></thead>
+                    <tbody>
+        `;
+
+        const tableRows = [];
+        for (let u = 42; u >= 1; u--) {
+            tableRows.push({ u, type: 'empty', asset: null, span: 1 });
+        }
+        
+        const usedPositions = new Set();
+        for (const { asset, start, end } of uMap.values()) {
+            const topRowIndex = 42 - end;
+            const span = end - start + 1;
+            
+            let canPlace = true;
+            for (let i = 0; i < span; i++) {
+                if (usedPositions.has(topRowIndex + i)) {
+                    canPlace = false;
+                    break;
+                }
+            }
+            
+            if (canPlace) {
+                tableRows[topRowIndex] = { u: end, type: 'device', asset, span };
+                for (let i = 0; i < span; i++) {
+                    usedPositions.add(topRowIndex + i);
+                    if (i > 0) {
+                        tableRows[topRowIndex + i] = { u: end - i, type: 'occupied' };
+                    }
+                }
+            } else {
+                console.warn(`设备 ${asset.ip} (U${start}-U${end}) 无法放置，位置被占用`);
+            }
+        }
+        
+        for (const row of tableRows) {
+            if (row.type === 'device') {
+                const tooltip = `资产编号: ${row.asset.asset_no} | 型号: ${row.asset.model} | 位置: U${row.asset.start_u}-U${row.asset.end_u} | IP: ${row.asset.ip} | 功率: ${row.asset.power} | 状态: ${row.asset.status}`;
+                html += `
+                    <tr>
+                        <td class="cell-u device-top">U${row.u}</td>
+                        <td rowspan="${row.span}" class="device-cell"><div class="device" title="${tooltip}" style="height: ${row.span * 24}px;">${row.asset.asset_no}<br/>${row.asset.model}</div></td>
+                        <td rowspan="${row.span}" class="cell-ip">${row.asset.ip || '-'}</td>
+                        <td rowspan="${row.span}" class="cell-power">${row.asset.power || '-'}</td>
+                    </tr>
+                `;
+            } else if (row.type === 'occupied') {
+                html += `<tr><td class="cell-u occupied">U${row.u}</td><td></td><td></td><td></td></tr>`;
+            } else {
+                html += `<tr><td class="cell-u">U${row.u}</td><td></td><td></td><td></td></tr>`;
+            }
+        }
+
+        html += `</tbody></table></div>`;
+    }
+
+    root.innerHTML = html;
+}
+
+async function refreshCabinets() {
+    const status = document.getElementById('refreshStatus');
+    status.textContent = '加载中...';
+    const assets = await fetchAssets();
+    renderAllCabinets(assets);
+    status.textContent = `✓ 已同步 (${assets.length}台设备)`;
+}
+
+async function exportToExcel() {
+    if (allAssets.length === 0) {
+        alert('暂无数据可导出');
+        return;
+    }
+    
+    // 检查是否加载了exceljs
+    if (typeof ExcelJS === 'undefined') {
+        alert('Excel导出功能需要加载exceljs库，请刷新页面重试');
+        return;
+    }
+    
+    // 创建工作簿
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CMDB系统';
+    workbook.lastModifiedBy = 'CMDB系统';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+    
+    // === 第一个Sheet：资产列表 ===
+    const worksheet = workbook.addWorksheet('资产列表');
+    
+    // 表头
+    const headers = ['机柜', 'U位', '资产编号', '型号', 'IP地址', '功率'];
+    const headerRow = worksheet.addRow(headers);
+    
+    // 表头样式
+    headerRow.eachCell(cell => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: '4CAF50' }
+        };
+        cell.font = {
+            color: { argb: 'FFFFFF' },
+            bold: true,
+            size: 12
+        };
+        cell.alignment = {
+            horizontal: 'center',
+            vertical: 'center'
+        };
+        cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+    });
+    
+    // 添加数据行
+    for (const asset of allAssets) {
+        for (let u = parseInt(asset.start_u, 10); u <= parseInt(asset.end_u, 10); u++) {
+            const row = worksheet.addRow([
+                asset.cabinet,
+                'U' + u,
+                asset.asset_no || '',
+                asset.model || '',
+                asset.ip || '',
+                (asset.power || '-') + 'W'
+            ]);
+            
+            // 数据行样式
+            row.eachCell(cell => {
+                cell.font = { size: 11 };
+                cell.alignment = {
+                    horizontal: 'left',
+                    vertical: 'center'
+                };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+        }
+    }
+    
+    // 设置列宽
+    worksheet.columns = [
+        { width: 12 },
+        { width: 8 },
+        { width: 18 },
+        { width: 22 },
+        { width: 15 },
+        { width: 10 }
+    ];
+    
+    // === 第二个Sheet：布局图 ===
+    if (typeof html2canvas !== 'undefined') {
+        const cabinetsRoot = document.getElementById('cabinets-root');
+        if (cabinetsRoot.innerHTML.trim()) {
+            // 创建临时容器用于截图
+            const exportContainer = document.createElement('div');
+            exportContainer.innerHTML = cabinetsRoot.innerHTML;
+            exportContainer.style.display = 'flex';
+            exportContainer.style.flexWrap = 'wrap';
+            exportContainer.style.gap = '15px';
+            exportContainer.style.justifyContent = 'center';
+            exportContainer.style.padding = '30px';
+            exportContainer.style.background = '#f5f7fa';
+            document.body.appendChild(exportContainer);
+            
+            try {
+                const canvas = await html2canvas(exportContainer, {
+                    scale: 2,
+                    backgroundColor: '#f5f7fa',
+                    useCORS: true
+                });
+                
+                // 创建布局图sheet
+                const imgSheet = workbook.addWorksheet('布局图');
+                
+                // 添加标题
+                const titleRow = imgSheet.addRow(['机柜布局图']);
+                titleRow.font = { bold: true, size: 16 };
+                titleRow.alignment = { horizontal: 'center' };
+                
+                const dateRow = imgSheet.addRow(['生成时间: ' + new Date().toLocaleString('zh-CN')]);
+                dateRow.font = { size: 11 };
+                dateRow.alignment = { horizontal: 'center' };
+                
+                imgSheet.addRow([]); // 空行
+                
+                // 将canvas转为blob
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                
+                // 添加图片到sheet
+                const imageId = workbook.addImage({
+                    buffer: await blob.arrayBuffer(),
+                    extension: 'png',
+                });
+                
+                // 插入图片
+                imgSheet.addImage(imageId, {
+                    tl: { col: 0, row: 3 },
+                    ext: { width: canvas.width / 2, height: canvas.height / 2 }
+                });
+                
+                // 设置行高
+                imgSheet.getRow(1).height = 30;
+                imgSheet.getRow(2).height = 25;
+                
+                document.body.removeChild(exportContainer);
+            } catch (err) {
+                console.error('添加图片失败:', err);
+                document.body.removeChild(exportContainer);
+            }
+        }
+    }
+    
+    // 导出文件
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `机柜布局_${new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')}.xlsx`);
+}
+
+function exportToHTML() {
+    const cabinetsRoot = document.getElementById('cabinets-root');
+    if (!cabinetsRoot.innerHTML.trim()) {
+        alert('暂无数据可导出');
+        return;
+    }
+    
+    const htmlContent = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机柜布局图 - ${new Date().toLocaleString('zh-CN')}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; padding: 20px; background: #f5f7fa; }
+        .report-header { text-align: center; margin-bottom: 20px; }
+        .report-header h1 { color: #333; font-size: 24px; margin-bottom: 8px; }
+        .report-header .date { color: #999; font-size: 14px; }
+        .cabinets-grid { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; max-width: 1600px; margin: 0 auto; }
+        .cabinet { flex: 1; min-width: 420px; max-width: 480px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e8e8e8; }
+        .cabinet-title { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 12px 14px; font-weight: bold; font-size: 14px; text-align: center; }
+        .rack-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .rack-table th { background: #f8f9fa; padding: 6px 8px; text-align: center; font-weight: 600; color: #555; border-bottom: 2px solid #dee2e6; font-size: 10px; }
+        .rack-table td { padding: 3px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; line-height: 1.2; }
+        .cell-u { text-align: center; font-weight: bold; color: #11998e; font-size: 9px; width: 50px; }
+        .cell-u.occupied { color: #bbb; background: #f5f5f5; }
+        .cell-u.device-top { color: #bbb; background: #f5f5f5; }
+        .device-cell { vertical-align: top; padding: 0; }
+        .device { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 4px 6px; font-size: 9px; margin: 2px 0; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+        .cell-ip { font-family: 'Consolas', monospace; font-size: 9px; color: #388e3c; width: 100px; }
+        .cell-power { font-size: 9px; color: #f57c00; width: 60px; }
+        .legend { margin: 20px auto; padding: 15px 25px; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-width: 600px; }
+        .legend h4 { margin-bottom: 10px; color: #333; font-size: 13px; }
+        .legend-items { display: flex; flex-wrap: wrap; gap: 20px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .legend-color { width: 20px; height: 20px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1>🗃️ 机柜布局图</h1>
+        <div class="date">生成时间: ${new Date().toLocaleString('zh-CN')}</div>
+    </div>
+    
+    <div class="cabinets-grid">${cabinetsRoot.innerHTML}</div>
+    
+    <div class="legend">
+        <h4>图例说明</h4>
+        <div class="legend-items">
+            <div class="legend-item"><div class="legend-color" style="background: #e3f2fd; border: 1px solid #90caf9;"></div>设备占位</div>
+            <div class="legend-item"><div class="legend-color" style="background: #f5f5f5;"></div>空闲U位</div>
+            <div class="legend-item"><span style="color: #11998e; font-weight: bold;">U位编号</span></div>
+            <div class="legend-item"><span style="color: #388e3c; font-family: monospace;">IP地址</span></div>
+            <div class="legend-item"><span style="color: #f57c00;">功率(W)</span></div>
+        </div>
+    </div>
+</body>
+</html>`;
+    
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `机柜布局图_${new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportToImage() {
+    const cabinetsRoot = document.getElementById('cabinets-root');
+    if (!cabinetsRoot.innerHTML.trim()) {
+        alert('暂无数据可导出');
+        return;
+    }
+    
+    alert('正在生成图片，请稍候...');
+    
+    const exportContainer = document.createElement('div');
+    exportContainer.innerHTML = cabinetsRoot.innerHTML;
+    exportContainer.style.display = 'flex';
+    exportContainer.style.flexWrap = 'wrap';
+    exportContainer.style.gap = '15px';
+    exportContainer.style.justifyContent = 'center';
+    exportContainer.style.padding = '30px';
+    exportContainer.style.background = '#f5f7fa';
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        .cabinet { flex: 1; min-width: 420px; max-width: 480px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e8e8e8; }
+        .cabinet-title { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 12px 14px; font-weight: bold; font-size: 14px; text-align: center; }
+        .rack-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .rack-table th { background: #f8f9fa; padding: 6px 8px; text-align: center; font-weight: 600; color: #555; border-bottom: 2px solid #dee2e6; font-size: 10px; }
+        .rack-table td { padding: 3px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; line-height: 1.2; }
+        .cell-u { text-align: center; font-weight: bold; color: #11998e; font-size: 9px; width: 50px; }
+        .cell-u.occupied { color: #bbb; background: #f5f5f5; }
+        .cell-u.device-top { color: #bbb; background: #f5f5f5; }
+        .device-cell { vertical-align: top; padding: 0; }
+        .device { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 4px 6px; font-size: 9px; margin: 2px 0; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+        .cell-ip { font-family: 'Consolas', monospace; font-size: 9px; color: #388e3c; width: 100px; }
+        .cell-power { font-size: 9px; color: #f57c00; width: 60px; }
+    `;
+    
+    exportContainer.appendChild(style);
+    document.body.appendChild(exportContainer);
+    
+    if (typeof html2canvas !== 'undefined') {
+        html2canvas(exportContainer, {
+            scale: 2,
+            backgroundColor: '#f5f7fa',
+            useCORS: true
+        }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `机柜布局图_${new Date().toLocaleString('zh-CN').replace(/[/:]/g, '-')}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            document.body.removeChild(exportContainer);
+        }).catch(err => {
+            console.error('导出图片失败:', err);
+            alert('导出图片失败，请检查控制台错误信息');
+            document.body.removeChild(exportContainer);
+        });
+    } else {
+        alert('导出图片功能需要加载html2canvas库，请联系管理员启用此功能。\n\n推荐使用"导出HTML"功能，同样可以保留样式。');
+        document.body.removeChild(exportContainer);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    refreshCabinets();
+    document.getElementById('refreshBtn').addEventListener('click', refreshCabinets);
+});
+</script>
+
+<style>
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; }
+.header h2 { color: white; margin: 0; font-size: 20px; }
+.actions { display: flex; align-items: center; gap: 12px; }
+.btn { padding: 8px 16px; border: none; background: rgba(255,255,255,0.2); color: white; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.3s; }
+.btn:hover { background: rgba(255,255,255,0.3); }
+#refreshStatus { font-size: 12px; color: rgba(255,255,255,0.8); }
+.cabinets-grid { display: flex; flex-wrap: wrap; gap: 15px; }
+.cabinet { flex: 1; min-width: 420px; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e8e8e8; }
+.cabinet-title { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 10px 14px; font-weight: bold; font-size: 14px; text-align: center; }
+.rack-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.rack-table th { background: #f8f9fa; padding: 4px 6px; text-align: center; font-weight: 600; color: #555; border-bottom: 2px solid #dee2e6; font-size: 9px; }
+.rack-table td { padding: 2px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; line-height: 1.2; }
+.cell-u { text-align: center; font-weight: bold; color: #11998e; font-size: 9px; width: 45px; }
+.cell-u.sub { color: #999; font-weight: normal; font-size: 8px; }
+.cell-u.occupied { color: #bbb; background: #f5f5f5; }
+.cell-u.device-top { color: #bbb; background: #f5f5f5; }
+.device-cell { vertical-align: top; padding: 0; }
+.device { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 3px 5px; font-size: 9px; cursor: pointer; transition: all 0.2s; margin: 1px 0; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.device:hover { background: #bbdefb; }
+.cell-ip { font-family: 'Consolas', monospace; font-size: 9px; color: #388e3c; width: 90px; }
+.cell-power { font-size: 9px; color: #f57c00; width: 60px; }
+.empty { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+</style>
+{% endblock %}
