@@ -3,3 +3,4 @@ pymysql==1.1.2
 openpyxl==3.1.2
 paramiko==3.4.0
 gunicorn==21.2.0
+APScheduler==4.0.0a6

@@ -9,6 +9,7 @@ from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
 from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog
 from django.utils import timezone
+from .scheduler import update_scheduler_job
 import paramiko
 import io
 import json
@@ -2880,12 +2881,19 @@ def save_backup_config_api(request):
             current_config['auto_backup_enabled'] = data['auto_backup_enabled']
         if 'auto_backup_time' in data:
             current_config['auto_backup_time'] = data['auto_backup_time']
+            # 将时间转换为 cron 表达式
+            time_parts = data['auto_backup_time'].split(':')
+            if len(time_parts) == 2:
+                hour = time_parts[0].strip()
+                minute = time_parts[1].strip()
+                current_config['auto_backup_cron'] = f'{minute} {hour} * * *'
         if 'auto_backup_cron' in data:
             current_config['auto_backup_cron'] = data['auto_backup_cron']
         
         success, error = save_backup_config(current_config)
         
         if success:
+            update_scheduler_job()
             return JsonResponse({'success': True, 'message': '备份配置保存成功'})
         else:
             return JsonResponse({'success': False, 'error': error})

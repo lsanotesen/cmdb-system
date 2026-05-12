@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    TZ=Asia/Shanghai
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-libmysqlclient-dev \
@@ -9,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     default-mysql-client \
     netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/*
+    tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
