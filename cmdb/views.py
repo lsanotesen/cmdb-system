@@ -337,8 +337,12 @@ def asset_edit(request, asset_id):
 def asset_delete(request, asset_id):
     try:
         asset = get_object_or_404(Host, id=asset_id)
+        asset_name = asset.hostname
         asset.delete()
-        messages.success(request, f'资产 {asset.hostname} 删除成功')
+
+        log_operation(request.user, 'delete', f'动态资产: {asset_name}', f'删除动态资产: {asset_name}', request.META.get('REMOTE_ADDR'))
+
+        messages.success(request, f'资产 {asset_name} 删除成功')
         return redirect('asset_list')
     except Exception as e:
         messages.error(request, f'删除资产失败: {str(e)}')
@@ -494,13 +498,15 @@ def asset_batch_delete(request):
             import json
             data = json.loads(request.body)
             asset_ids = data.get('ids', [])
-            
+
             if not asset_ids:
                 return JsonResponse({'success': False, 'message': '请选择要删除的资产'})
-            
-            # 删除选中的资产
+
+            # 删除选定的资产
             deleted_count = Host.objects.filter(id__in=asset_ids).delete()[0]
-            
+
+            log_operation(request.user, 'delete', '动态资产', f'批量删除 {deleted_count} 个动态资产', request.META.get('REMOTE_ADDR'))
+
             return JsonResponse({'success': True, 'message': f'成功删除 {deleted_count} 个资产'})
         else:
             return JsonResponse({'success': False, 'message': '只支持POST请求'})
@@ -3328,16 +3334,19 @@ def database_restore(request):
 def delete_backup(request, filename):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': '只支持POST请求'})
-    
+
     try:
         config = get_backup_config()
         backup_dir = config['backup_dir']
         filepath = os.path.join(backup_dir, filename)
-        
+
         if not os.path.exists(filepath):
             return JsonResponse({'success': False, 'error': '文件不存在'})
-        
+
         os.remove(filepath)
+
+        log_operation(request.user, 'delete', f'备份文件: {filename}', f'删除备份文件: {filename}', request.META.get('REMOTE_ADDR'))
+
         return JsonResponse({'success': True, 'message': '备份文件删除成功'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})

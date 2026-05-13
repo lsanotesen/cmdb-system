@@ -164,6 +164,7 @@
                 {% for op in recent_operations %}
                 <div class="operation-item" style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eee;">
                     <span class="operation-time" style="color: #999; font-size: 13px; min-width: 140px;">{{ op.time }}</span>
+                    <span class="operation-user" style="color: #667eea; font-size: 13px; min-width: 80px;">{{ op.user }}</span>
                     <span class="operation-content" style="flex: 1; color: #333; font-size: 13px;">{{ op.content }}</span>
                 </div>
                 {% endfor %}
