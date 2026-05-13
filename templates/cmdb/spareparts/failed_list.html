@@ -1,0 +1,174 @@
+{% extends 'cmdb/base.html' %}
+
+{% block title %}故障备件 - CMDB{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- 侧边栏 -->
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-header">备件管理</div>
+                <div class="list-group">
+                    <a href="{% url 'spareparts_available' %}" class="list-group-item list-group-item-action">可用备件</a>
+                    <a href="{% url 'spareparts_failed' %}" class="list-group-item list-group-item-action active">故障备件</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h2>故障备件列表</h2>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>备件资产编号</th>
+                                <th>类型</th>
+                                <th>原来关联服务器</th>
+                                <th>下架时间</th>
+                                <th>故障原因</th>
+                                <th>图片</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for part in spareparts %}
+                            <tr>
+                                <td>{{ part.asset_code or '-' }}</td>
+                                <td>{{ part.get_type_display }}</td>
+                                <td>
+                                    {% if part.related_asset %}
+                                    {{ part.related_asset.asset_no }} - {{ part.related_asset.ip }} - {{ part.related_asset.device_model }}
+                                    {% else %}
+                                    {{ part.related_asset_no or '-' }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ part.remove_date|date:"Y-m-d" if part.remove_date else '-' }}</td>
+                                <td>{{ part.failure_reason or '-' }}</td>
+                                <td>
+                                    {% if part.get_images_list %}
+                                    <img src="{{ part.get_images_list.0 }}" width="50" height="50" class="img-thumbnail">
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" onclick="showEditModal({{ part.id }})">编辑</button>
+                                    <button class="btn btn-sm btn-danger" onclick="showDeleteConfirm({{ part.id }})">删除</button>
+                                    <button class="btn btn-sm btn-success" onclick="showRestoreModal({{ part.id }})">重新上架</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center">暂无故障备件</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑备件弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content" id="editModalContent">
+        </div>
+    </div>
+</div>
+
+<!-- 重新上架弹窗 -->
+<div class="modal fade" id="restoreModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重新上架备件</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>确定要将此备件重新上架吗？</p>
+                <p>上架后，下架时间和故障原因将被清空，备件将回到可用备件列表。</p>
+                <input type="hidden" id="restore_sparepart_id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" onclick="submitRestoreForm()">确认上架</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 显示编辑弹窗
+function showEditModal(id) {
+    fetch('{% url "spareparts_edit" 0 %}'.replace('0', id))
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('editModalContent').innerHTML = html;
+        $('#editModal').modal('show');
+    });
+}
+
+// 显示重新上架弹窗
+function showRestoreModal(id) {
+    document.getElementById('restore_sparepart_id').value = id;
+    $('#restoreModal').modal('show');
+}
+
+// 提交重新上架表单
+function submitRestoreForm() {
+    var sparepartId = document.getElementById('restore_sparepart_id').value;
+    
+    fetch('{% url "spareparts_restore" 0 %}'.replace('0', sparepartId), {
+        method: 'POST',
+        headers: { 
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#restoreModal').modal('hide');
+            location.reload();
+        } else {
+            alert('上架失败: ' + data.error);
+        }
+    });
+}
+
+// 显示删除确认
+function showDeleteConfirm(id) {
+    if (confirm('确定要删除这个备件吗？')) {
+        fetch('{% url "spareparts_delete" 0 %}'.replace('0', id), {
+            method: 'POST',
+            headers: { 
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('删除失败: ' + data.error);
+            }
+        });
+    }
+}
+
+// 获取CSRF token
+function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length == 2) return parts.pop().split(";").shift();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,98 @@
+<div class="modal-header">
+    <h5 class="modal-title">添加备件</h5>
+    <button type="button" class="close" data-dismiss="modal">&times;</button>
+</div>
+<div class="modal-body">
+    <form id="addForm" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>备件资产编号（可选）</label>
+                <input type="text" class="form-control" name="asset_code" placeholder="如 HD-2025-001">
+            </div>
+            <div class="form-group col-md-6">
+                <label>备件类型 *</label>
+                <select class="form-control" name="type" required>
+                    <option value="">请选择</option>
+                    <option value="hard_drive">硬盘</option>
+                    <option value="memory">内存</option>
+                    <option value="power_supply">电源</option>
+                    <option value="fan">风扇</option>
+                    <option value="other">其他</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>关联服务器</label>
+                <select class="form-control" name="related_asset_no" id="add_related_asset_select">
+                    <option value="">请选择服务器</option>
+                    {% for asset in assets %}
+                    <option value="{{ asset.asset_no }}" 
+                            data-ip="{{ asset.ip }}" 
+                            data-cabinet="{{ asset.cabinet }}">
+                        {{ asset.asset_no }} - {{ asset.ip }} - {{ asset.device_model }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group col-md-6">
+                <label>分配时间</label>
+                <input type="date" class="form-control" name="allocate_date">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>IP地址</label>
+                <input type="text" class="form-control" name="ip_address" id="add_ip_address">
+            </div>
+            <div class="form-group col-md-6">
+                <label>机柜位置</label>
+                <input type="text" class="form-control" name="cabinet_location" id="add_cabinet_location">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>硬件图片（可选）</label>
+            <input type="file" class="form-control" name="image" accept="image/*">
+        </div>
+    </form>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+    <button type="button" class="btn btn-primary" onclick="submitAddForm()">保存</button>
+</div>
+
+<script>
+// 选择服务器时自动填充IP和机柜
+document.getElementById('add_related_asset_select').addEventListener('change', function() {
+    var selectedOption = this.options[this.selectedIndex];
+    document.getElementById('add_ip_address').value = selectedOption.dataset.ip || '';
+    document.getElementById('add_cabinet_location').value = selectedOption.dataset.cabinet || '';
+});
+
+// 提交添加表单
+function submitAddForm() {
+    var form = document.getElementById('addForm');
+    var formData = new FormData(form);
+    
+    fetch('{% url "spareparts_add" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#addModal').modal('hide');
+            location.reload();
+        } else {
+            alert('添加失败: ' + data.error);
+        }
+    });
+}
+
+function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length == 2) return parts.pop().split(";").shift();
+}
+</script>

@@ -335,6 +335,61 @@ class Module(models.Model):
         ordering = ['order']
 
 
+# 备件类型枚举
+SPARE_PART_TYPE = [
+    ('hard_drive', '硬盘'),
+    ('memory', '内存'),
+    ('power_supply', '电源'),
+    ('fan', '风扇'),
+    ('other', '其他'),
+]
+
+# 备件状态枚举
+SPARE_PART_STATUS = [
+    ('available', '可用'),
+    ('failed', '故障下架'),
+]
+
+class SparePart(models.Model):
+    """备件模型"""
+    asset_code = models.CharField('备件资产编号', max_length=100, blank=True, null=True, help_text='如 HD-2025-001，可选')
+    type = models.CharField('备件类型', max_length=50, choices=SPARE_PART_TYPE)
+    related_asset_no = models.CharField('关联服务器资产编号', max_length=100, blank=True, null=True, help_text='从静态资产库中选择')
+    ip_address = models.GenericIPAddressField('IP地址', blank=True, null=True)
+    cabinet_location = models.CharField('机柜位置', max_length=100, blank=True)
+    allocate_date = models.DateField('分配时间', blank=True, null=True)
+    remove_date = models.DateField('下架时间', blank=True, null=True)
+    failure_reason = models.TextField('故障原因', blank=True)
+    images = models.TextField('图片路径JSON', blank=True)
+    status = models.CharField('状态', max_length=20, choices=SPARE_PART_STATUS, default='available')
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    def __str__(self):
+        return self.asset_code or f'备件{self.id}'
+
+    class Meta:
+        verbose_name = '备件'
+        verbose_name_plural = '备件管理'
+
+    def get_images_list(self):
+        """获取图片路径列表"""
+        if self.images:
+            try:
+                return json.loads(self.images)
+            except:
+                return []
+        return []
+
+    def get_related_asset(self):
+        """获取关联的静态资产"""
+        if self.related_asset_no:
+            try:
+                return StaticAsset.objects.get(asset_no=self.related_asset_no)
+            except StaticAsset.DoesNotExist:
+                return None
+        return None
+
 class Role(models.Model):
     """角色模型"""
     name = models.CharField('角色名称', max_length=100, unique=True)

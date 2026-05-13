@@ -237,6 +237,12 @@
                         </a>
                     </div>
                     {% endif %}
+                    <div class="nav-item">
+                        <a href="{% url 'spareparts_available' %}" {% if '/cmdb/spareparts' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-wrench"></i>
+                            <span>备件管理</span>
+                        </a>
+                    </div>
                 </div>
                 {% if user.is_superuser %}
                 <div class="nav-section">
@@ -258,7 +264,7 @@
                         <a href="{% url 'cmdb_index' %}">首页</a>
                         {% if request.path != '/cmdb/' and request.path != '/cmdb' %}
                         <span>/</span>
-                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% endif %}</span>
+                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% elif '/spareparts' in request.path %}备件管理{% endif %}</span>
                         {% endif %}
                     </div>
                 </div>

@@ -1,0 +1,291 @@
+{% extends 'cmdb/base.html' %}
+
+{% block title %}可用备件 - CMDB{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- 侧边栏 -->
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-header">备件管理</div>
+                <div class="list-group">
+                    <a href="{% url 'spareparts_available' %}" class="list-group-item list-group-item-action active">可用备件</a>
+                    <a href="{% url 'spareparts_failed' %}" class="list-group-item list-group-item-action">故障备件</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h2>可用备件列表</h2>
+                    <button class="btn btn-primary float-right" onclick="showAddModal()">添加备件</button>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>备件资产编号</th>
+                                <th>类型</th>
+                                <th>关联服务器</th>
+                                <th>IP地址</th>
+                                <th>机柜位置</th>
+                                <th>分配时间</th>
+                                <th>图片</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for part in spareparts %}
+                            <tr>
+                                <td>{{ part.asset_code or '-' }}</td>
+                                <td>{{ part.get_type_display }}</td>
+                                <td>
+                                    {% if part.related_asset %}
+                                    {{ part.related_asset.asset_no }} - {{ part.related_asset.device_model }}
+                                    {% else %}
+                                    {{ part.related_asset_no or '-' }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ part.ip_address or '-' }}</td>
+                                <td>{{ part.cabinet_location or '-' }}</td>
+                                <td>{{ part.allocate_date|date:"Y-m-d" if part.allocate_date else '-' }}</td>
+                                <td>
+                                    {% if part.get_images_list %}
+                                    <img src="{{ part.get_images_list.0 }}" width="50" height="50" class="img-thumbnail">
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning" onclick="showEditModal({{ part.id }})">编辑</button>
+                                    <button class="btn btn-sm btn-danger" onclick="showDeleteConfirm({{ part.id }})">删除</button>
+                                    <button class="btn btn-sm btn-info" onclick="showRemoveModal({{ part.id }})">下架</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">暂无可用备件</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加备件弹窗 -->
+<div class="modal fade" id="addModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加备件</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addForm" enctype="multipart/form-data">
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>备件资产编号（可选）</label>
+                            <input type="text" class="form-control" name="asset_code" placeholder="如 HD-2025-001">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>备件类型 *</label>
+                            <select class="form-control" name="type" required>
+                                <option value="">请选择</option>
+                                <option value="hard_drive">硬盘</option>
+                                <option value="memory">内存</option>
+                                <option value="power_supply">电源</option>
+                                <option value="fan">风扇</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>关联服务器 *</label>
+                            <select class="form-control" name="related_asset_no" id="related_asset_select">
+                                <option value="">请选择服务器</option>
+                                {% for asset in assets %}
+                                <option value="{{ asset.asset_no }}" 
+                                        data-ip="{{ asset.ip }}" 
+                                        data-cabinet="{{ asset.cabinet }}">
+                                    {{ asset.asset_no }} - {{ asset.ip }} - {{ asset.device_model }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>分配时间</label>
+                            <input type="date" class="form-control" name="allocate_date">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>IP地址</label>
+                            <input type="text" class="form-control" name="ip_address" id="ip_address">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>机柜位置</label>
+                            <input type="text" class="form-control" name="cabinet_location" id="cabinet_location">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>硬件图片（可选）</label>
+                        <input type="file" class="form-control" name="image" accept="image/*">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddForm()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑备件弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content" id="editModalContent">
+        </div>
+    </div>
+</div>
+
+<!-- 下架备件弹窗 -->
+<div class="modal fade" id="removeModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">备件下架</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="removeForm">
+                    <input type="hidden" name="sparepart_id" id="remove_sparepart_id">
+                    <div class="form-group">
+                        <label>下架时间</label>
+                        <input type="date" class="form-control" name="remove_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label>故障原因</label>
+                        <textarea class="form-control" name="failure_reason" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" onclick="submitRemoveForm()">确认下架</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 显示添加弹窗
+function showAddModal() {
+    document.getElementById('addForm').reset();
+    document.getElementById('ip_address').value = '';
+    document.getElementById('cabinet_location').value = '';
+    $('#addModal').modal('show');
+}
+
+// 选择服务器时自动填充IP和机柜
+document.getElementById('related_asset_select').addEventListener('change', function() {
+    var selectedOption = this.options[this.selectedIndex];
+    document.getElementById('ip_address').value = selectedOption.dataset.ip || '';
+    document.getElementById('cabinet_location').value = selectedOption.dataset.cabinet || '';
+});
+
+// 提交添加表单
+function submitAddForm() {
+    var form = document.getElementById('addForm');
+    var formData = new FormData(form);
+    
+    fetch('{% url "spareparts_add" %}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#addModal').modal('hide');
+            location.reload();
+        } else {
+            alert('添加失败: ' + data.error);
+        }
+    });
+}
+
+// 显示编辑弹窗
+function showEditModal(id) {
+    fetch('{% url "spareparts_edit" 0 %}'.replace('0', id))
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('editModalContent').innerHTML = html;
+        $('#editModal').modal('show');
+    });
+}
+
+// 显示下架弹窗
+function showRemoveModal(id) {
+    document.getElementById('remove_sparepart_id').value = id;
+    document.getElementById('removeForm').querySelector('input[name="remove_date"]').value = new Date().toISOString().split('T')[0];
+    $('#removeModal').modal('show');
+}
+
+// 提交下架表单
+function submitRemoveForm() {
+    var sparepartId = document.getElementById('remove_sparepart_id').value;
+    var formData = new FormData(document.getElementById('removeForm'));
+    
+    fetch('{% url "spareparts_remove" 0 %}'.replace('0', sparepartId), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#removeModal').modal('hide');
+            location.reload();
+        } else {
+            alert('下架失败: ' + data.error);
+        }
+    });
+}
+
+// 显示删除确认
+function showDeleteConfirm(id) {
+    if (confirm('确定要删除这个备件吗？')) {
+        fetch('{% url "spareparts_delete" 0 %}'.replace('0', id), {
+            method: 'POST',
+            headers: { 
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('删除失败: ' + data.error);
+            }
+        });
+    }
+}
+
+// 获取CSRF token
+function getCookie(name) {
+    var value = "; " + document.cookie;
+    var parts = value.split("; " + name + "=");
+    if (parts.length == 2) return parts.pop().split(";").shift();
+}
+</script>
+{% endblock %}

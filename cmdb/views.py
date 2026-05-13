@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
-from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog
+from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart
 from django.utils import timezone
 from .scheduler import update_scheduler_job
 import paramiko
@@ -3866,6 +3866,181 @@ def permission_management(request):
         'active_tab': 'permissions'
     })
 
+
+# 备件管理相关视图
+
+@login_required
+def spareparts_available(request):
+    """可用备件页面"""
+    spareparts = SparePart.objects.filter(status='available').order_by('-created_at')
+    
+    # 获取关联资产信息
+    for part in spareparts:
+        part.related_asset = part.get_related_asset()
+    
+    return render(request, 'cmdb/spareparts/available_list.html', {
+        'spareparts': spareparts,
+        'active_tab': 'spareparts_available'
+    })
+
+@login_required  
+def spareparts_failed(request):
+    """故障备件页面"""
+    spareparts = SparePart.objects.filter(status='failed').order_by('-remove_date')
+    
+    # 获取关联资产信息
+    for part in spareparts:
+        part.related_asset = part.get_related_asset()
+    
+    return render(request, 'cmdb/spareparts/failed_list.html', {
+        'spareparts': spareparts,
+        'active_tab': 'spareparts_failed'
+    })
+
+@login_required
+def spareparts_add(request):
+    """添加备件"""
+    if request.method == 'POST':
+        try:
+            sparepart = SparePart()
+            sparepart.asset_code = request.POST.get('asset_code') or None
+            sparepart.type = request.POST.get('type')
+            sparepart.related_asset_no = request.POST.get('related_asset_no') or None
+            sparepart.ip_address = request.POST.get('ip_address') or None
+            sparepart.cabinet_location = request.POST.get('cabinet_location')
+            sparepart.allocate_date = request.POST.get('allocate_date') or None
+            sparepart.status = 'available'
+            
+            # 处理图片上传
+            images = []
+            if request.FILES:
+                for key in request.FILES:
+                    file = request.FILES[key]
+                    # 保存图片到服务器
+                    import uuid
+                    ext = file.name.split('.')[-1]
+                    filename = f"{uuid.uuid4().hex}.{ext}"
+                    filepath = f'/app/media/spareparts/{filename}'
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    with open(filepath, 'wb') as f:
+                        for chunk in file.chunks():
+                            f.write(chunk)
+                    images.append(f'/media/spareparts/{filename}')
+            
+            if images:
+                sparepart.images = json.dumps(images)
+            
+            sparepart.save()
+            
+            log_operation(request.user, 'add', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '添加备件', request.META.get('REMOTE_ADDR'))
+            messages.success(request, '备件添加成功！')
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # 获取可用资产列表
+    assets = StaticAsset.objects.filter(asset_no__isnull=False).order_by('asset_no')
+    return render(request, 'cmdb/spareparts/modal_add.html', {'assets': assets})
+
+@login_required
+def spareparts_edit(request, sparepart_id):
+    """编辑备件"""
+    sparepart = get_object_or_404(SparePart, id=sparepart_id)
+    
+    if request.method == 'POST':
+        try:
+            sparepart.asset_code = request.POST.get('asset_code') or None
+            sparepart.type = request.POST.get('type')
+            sparepart.related_asset_no = request.POST.get('related_asset_no') or None
+            sparepart.ip_address = request.POST.get('ip_address') or None
+            sparepart.cabinet_location = request.POST.get('cabinet_location')
+            
+            if sparepart.status == 'available':
+                sparepart.allocate_date = request.POST.get('allocate_date') or None
+            else:
+                sparepart.remove_date = request.POST.get('remove_date') or None
+                sparepart.failure_reason = request.POST.get('failure_reason')
+            
+            sparepart.save()
+            
+            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '编辑备件', request.META.get('REMOTE_ADDR'))
+            messages.success(request, '备件更新成功！')
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    assets = StaticAsset.objects.filter(asset_no__isnull=False).order_by('asset_no')
+    return render(request, 'cmdb/spareparts/modal_edit.html', {'sparepart': sparepart, 'assets': assets})
+
+@login_required
+def spareparts_delete(request, sparepart_id):
+    """删除备件"""
+    if request.method == 'POST':
+        try:
+            sparepart = get_object_or_404(SparePart, id=sparepart_id)
+            target = f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}'
+            sparepart.delete()
+            
+            log_operation(request.user, 'delete', target, '删除备件', request.META.get('REMOTE_ADDR'))
+            return JsonResponse({'success': True, 'message': '删除成功'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+@login_required
+def spareparts_remove(request, sparepart_id):
+    """下架备件"""
+    if request.method == 'POST':
+        try:
+            sparepart = get_object_or_404(SparePart, id=sparepart_id)
+            sparepart.status = 'failed'
+            sparepart.remove_date = request.POST.get('remove_date') or timezone.now().date()
+            sparepart.failure_reason = request.POST.get('failure_reason', '')
+            sparepart.save()
+            
+            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '备件下架', request.META.get('REMOTE_ADDR'))
+            return JsonResponse({'success': True, 'message': '备件已下架'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+@login_required
+def spareparts_restore(request, sparepart_id):
+    """重新上架备件"""
+    if request.method == 'POST':
+        try:
+            sparepart = get_object_or_404(SparePart, id=sparepart_id)
+            sparepart.status = 'available'
+            sparepart.remove_date = None
+            sparepart.failure_reason = ''
+            sparepart.save()
+            
+            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '备件重新上架', request.META.get('REMOTE_ADDR'))
+            return JsonResponse({'success': True, 'message': '备件已重新上架'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+@login_required
+def api_get_assets(request):
+    """获取可用资产列表API（用于下拉选择）"""
+    assets = StaticAsset.objects.filter(asset_no__isnull=False).values('asset_no', 'ip', 'device_model', 'cabinet')
+    assets_list = list(assets)
+    return JsonResponse({'assets': assets_list})
+
+@login_required
+def api_get_asset_info(request, asset_no):
+    """获取单个资产信息API"""
+    try:
+        asset = StaticAsset.objects.get(asset_no=asset_no)
+        return JsonResponse({
+            'asset_no': asset.asset_no,
+            'ip': str(asset.ip) if asset.ip else '',
+            'cabinet': asset.cabinet,
+            'device_model': asset.device_model
+        })
+    except StaticAsset.DoesNotExist:
+        return JsonResponse({'error': '资产不存在'}, status=404)
 
 # 测试侧边栏页面
 def test_sidebar(request):

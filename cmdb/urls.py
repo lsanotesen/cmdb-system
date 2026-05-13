@@ -107,4 +107,17 @@ urlpatterns = [
     path('backup/database_restore/', views.database_restore, name='database_restore'),
     path('backup/config/', views.get_backup_config_api, name='get_backup_config'),
     path('backup/config/save/', views.save_backup_config_api, name='save_backup_config'),
+
+    # 备件管理
+    path('spareparts/available/', views.spareparts_available, name='spareparts_available'),
+    path('spareparts/failed/', views.spareparts_failed, name='spareparts_failed'),
+    path('spareparts/add/', views.spareparts_add, name='spareparts_add'),
+    path('spareparts/<int:sparepart_id>/edit/', views.spareparts_edit, name='spareparts_edit'),
+    path('spareparts/<int:sparepart_id>/delete/', views.spareparts_delete, name='spareparts_delete'),
+    path('spareparts/<int:sparepart_id>/remove/', views.spareparts_remove, name='spareparts_remove'),
+    path('spareparts/<int:sparepart_id>/restore/', views.spareparts_restore, name='spareparts_restore'),
+    
+    # 备件相关API
+    path('api/assets/list/', views.api_get_assets, name='api_get_assets'),
+    path('api/assets/<str:asset_no>/', views.api_get_asset_info, name='api_get_asset_info'),
 ]
