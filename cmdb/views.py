@@ -539,7 +539,9 @@ def idc_add(request):
             # 创建IDC
             idc = Idc(name=name, address=address, phone=phone, contact=contact, desc=desc)
             idc.save()
-            
+
+            log_operation(request.user, 'add', f'IDC: {name}', f'添加IDC机房: {name}', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'IDC {name} 添加成功')
             return redirect('idc_list')
         else:
@@ -583,8 +585,12 @@ def idc_edit(request, idc_id):
 def idc_delete(request, idc_id):
     try:
         idc = get_object_or_404(Idc, id=idc_id)
+        idc_name = idc.name
         idc.delete()
-        messages.success(request, f'IDC {idc.name} 删除成功')
+
+        log_operation(request.user, 'delete', f'IDC: {idc_name}', f'删除IDC机房: {idc_name}', request.META.get('REMOTE_ADDR'))
+
+        messages.success(request, f'IDC {idc_name} 删除成功')
         return redirect('idc_list')
     except Exception as e:
         messages.error(request, f'删除IDC失败: {str(e)}')
@@ -612,7 +618,9 @@ def cabinet_add(request):
             # 创建机柜
             cabinet = Cabinet(name=name, idc_id=idc_id, desc=desc)
             cabinet.save()
-            
+
+            log_operation(request.user, 'add', f'机柜: {name}', f'添加机柜: {name}', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'机柜 {name} 添加成功')
             return redirect('cabinet_list')
         else:
@@ -654,8 +662,12 @@ def cabinet_edit(request, cabinet_id):
 def cabinet_delete(request, cabinet_id):
     try:
         cabinet = get_object_or_404(Cabinet, id=cabinet_id)
+        cabinet_name = cabinet.name
         cabinet.delete()
-        messages.success(request, f'机柜 {cabinet.name} 删除成功')
+
+        log_operation(request.user, 'delete', f'机柜: {cabinet_name}', f'删除机柜: {cabinet_name}', request.META.get('REMOTE_ADDR'))
+
+        messages.success(request, f'机柜 {cabinet_name} 删除成功')
         return redirect('cabinet_list')
     except Exception as e:
         messages.error(request, f'删除机柜失败: {str(e)}')
@@ -723,13 +735,9 @@ def group_edit(request, group_id):
             group.name = name
             group.desc = desc
             group.save()
-            
-            # 清空并重新添加服务器
-            group.serverList.clear()
-            if server_ids:
-                servers = Host.objects.filter(id__in=server_ids)
-                group.serverList.add(*servers)
-            
+
+            log_operation(request.user, 'edit', f'资产组: {name}', f'更新资产组: {name}', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'资产组 {name} 更新成功')
             return redirect('group_list')
         else:
@@ -2349,7 +2357,9 @@ def static_asset_add(request):
             asset.memo = request.POST.get('memo')
             asset.status = request.POST.get('status')
             asset.save()
-            
+
+            log_operation(request.user, 'add', f'静态资产: {asset.asset_no}', f'添加静态资产: {asset.asset_no}', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'静态资产 {asset.asset_no} 添加成功')
             return redirect('static_asset_list')
         else:
@@ -2381,7 +2391,9 @@ def static_asset_edit(request, asset_id):
             asset.memo = request.POST.get('memo')
             asset.status = request.POST.get('status')
             asset.save()
-            
+
+            log_operation(request.user, 'edit', f'静态资产: {asset.asset_no}', f'更新静态资产: {asset.asset_no}', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'静态资产 {asset.asset_no} 更新成功')
             return redirect('static_asset_list')
         else:
@@ -2397,6 +2409,9 @@ def static_asset_delete(request, asset_id):
         asset = get_object_or_404(StaticAsset, id=asset_id)
         asset_no = asset.asset_no
         asset.delete()
+
+        log_operation(request.user, 'delete', f'静态资产: {asset_no}', f'删除静态资产: {asset_no}', request.META.get('REMOTE_ADDR'))
+
         messages.success(request, f'静态资产 {asset_no} 删除成功')
         return redirect('static_asset_list')
     except Exception as e:
@@ -2417,6 +2432,9 @@ def static_asset_batch_delete(request):
                         deleted_count += 1
                     except:
                         continue
+
+                log_operation(request.user, 'delete', f'静态资产(批量)', f'批量删除 {deleted_count} 条静态资产', request.META.get('REMOTE_ADDR'))
+
                 messages.success(request, f'成功删除 {deleted_count} 条静态资产')
             return redirect('static_asset_list')
         return redirect('static_asset_list')
@@ -2550,6 +2568,8 @@ def static_asset_import(request):
                     continue
             
             # 显示导入结果
+            log_operation(request.user, 'import', f'静态资产', f'导入静态资产Excel: 成功{imported_count}条, 跳过{skipped_count}条, 错误{error_count}条', request.META.get('REMOTE_ADDR'))
+
             messages.success(request, f'导入完成！成功导入 {imported_count} 条数据，跳过 {skipped_count} 条，错误 {error_count} 条')
             return redirect('static_asset_list')
         else:
@@ -2622,6 +2642,9 @@ def export_static_assets_excel(request):
         from django.http import HttpResponse
         response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         response['Content-Disposition'] = f'attachment; filename={filename}'
+
+        log_operation(request.user, 'export', '静态资产', '导出静态资产Excel', request.META.get('REMOTE_ADDR'))
+
         return response
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'导出失败: {str(e)}'}, json_dumps_params={'ensure_ascii': False})
