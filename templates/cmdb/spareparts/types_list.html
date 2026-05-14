@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>备件类型管理</h1>
+    <div class="page-actions">
+        <button class="btn btn-primary" onclick="openAddModal()">
+            <i class="fas fa-plus"></i> 添加类型
+        </button>
+        <button class="btn btn-secondary" onclick="location.href='{% url 'spareparts_list' %}'">
+            <i class="fas fa-arrow-left"></i> 返回备件列表
+        </button>
+    </div>
+</div>
+
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>类型名称</th>
+                <th>类型代码</th>
+                <th>排序</th>
+                <th>状态</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for type in types %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ type.name }}</td>
+                <td>{{ type.code }}</td>
+                <td>{{ type.order }}</td>
+                <td>{% if type.is_active %}<span class="status-active">启用</span>{% else %}<span class="status-inactive">禁用</span>{% endif %}</td>
+                <td>{{ type.created_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                    <button class="btn btn-sm btn-edit" onclick="openEditModal({{ type.id }})">编辑</button>
+                    <button class="btn btn-sm btn-delete" onclick="deleteType({{ type.id }})">删除</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">暂无类型数据</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 添加类型弹窗 -->
+<div class="modal" id="addModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>添加备件类型</h2>
+            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+        </div>
+        <form id="addForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>类型名称 *</label>
+                    <input type="text" name="name" required placeholder="如 硬盘">
+                </div>
+                <div class="form-group">
+                    <label>类型代码 *</label>
+                    <input type="text" name="code" required placeholder="如 hard_drive">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>排序</label>
+                    <input type="number" name="order" value="0">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑类型弹窗 -->
+<div class="modal" id="editModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>编辑备件类型</h2>
+            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+        </div>
+        <form id="editForm">
+            <input type="hidden" name="type_id" id="edit_type_id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>类型名称 *</label>
+                    <input type="text" name="name" id="edit_name" required>
+                </div>
+                <div class="form-group">
+                    <label>类型代码 *</label>
+                    <input type="text" name="code" id="edit_code" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>排序</label>
+                    <input type="number" name="order" id="edit_order">
+                </div>
+                <div class="form-group">
+                    <label>启用状态</label>
+                    <input type="checkbox" name="is_active" id="edit_is_active">
+                    <label for="edit_is_active">启用</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('editModal')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addModal').style.display = 'block';
+}
+
+function openEditModal(id) {
+    fetch(`/cmdb/spareparts/type/${id}/edit/`)
+    .then(response => response.text())
+    .then(data => {
+        document.getElementById('editModal').style.display = 'block';
+        fetchTypeData(id);
+    });
+}
+
+function fetchTypeData(id) {
+    fetch(`/cmdb/spareparts/type/${id}/edit/`)
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('edit_type_id').value = data.id;
+        document.getElementById('edit_name').value = data.name;
+        document.getElementById('edit_code').value = data.code;
+        document.getElementById('edit_order').value = data.order;
+        document.getElementById('edit_is_active').checked = data.is_active;
+    });
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+document.getElementById('addForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('{% url 'sparepart_type_add' %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+});
+
+document.getElementById('editForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const id = document.getElementById('edit_type_id').value;
+    
+    fetch(`/cmdb/spareparts/type/${id}/edit/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+});
+
+function deleteType(id) {
+    if (confirm('确定要删除这个类型吗？')) {
+        fetch(`/cmdb/spareparts/type/${id}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+}
+
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

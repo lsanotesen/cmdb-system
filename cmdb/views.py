@@ -3870,31 +3870,11 @@ def permission_management(request):
 # 备件管理相关视图
 
 @login_required
-def spareparts_available(request):
-    """可用备件页面"""
-    spareparts = SparePart.objects.filter(status='available').order_by('-created_at')
-    
-    # 获取关联资产信息
-    for part in spareparts:
-        part.related_asset = part.get_related_asset()
-    
-    return render(request, 'cmdb/spareparts/available_list.html', {
-        'spareparts': spareparts,
-        'active_tab': 'spareparts_available'
-    })
-
-@login_required  
-def spareparts_failed(request):
-    """故障备件页面"""
-    spareparts = SparePart.objects.filter(status='failed').order_by('-remove_date')
-    
-    # 获取关联资产信息
-    for part in spareparts:
-        part.related_asset = part.get_related_asset()
-    
-    return render(request, 'cmdb/spareparts/failed_list.html', {
-        'spareparts': spareparts,
-        'active_tab': 'spareparts_failed'
+def spareparts_list(request):
+    """备件列表页面"""
+    spareparts = SparePart.objects.all().order_by('-created_at')
+    return render(request, 'cmdb/spareparts/list.html', {
+        'spareparts': spareparts
     })
 
 @login_required
@@ -3904,19 +3884,23 @@ def spareparts_add(request):
         try:
             sparepart = SparePart()
             sparepart.asset_code = request.POST.get('asset_code') or None
-            sparepart.type = request.POST.get('type')
-            sparepart.related_asset_no = request.POST.get('related_asset_no') or None
-            sparepart.ip_address = request.POST.get('ip_address') or None
-            sparepart.cabinet_location = request.POST.get('cabinet_location')
-            sparepart.allocate_date = request.POST.get('allocate_date') or None
-            sparepart.status = 'available'
+            sparepart.name = request.POST.get('name')
+            sparepart.brand = request.POST.get('brand')
+            sparepart.model = request.POST.get('model')
+            sparepart.size = request.POST.get('size')
+            sparepart.serial_number = request.POST.get('serial_number')
+            sparepart.location = request.POST.get('location')
+            sparepart.purchase_date = request.POST.get('purchase_date') or None
+            
+            type_id = request.POST.get('type')
+            if type_id:
+                sparepart.type_id = type_id
             
             # 处理图片上传
             images = []
             if request.FILES:
                 for key in request.FILES:
                     file = request.FILES[key]
-                    # 保存图片到服务器
                     import uuid
                     ext = file.name.split('.')[-1]
                     filename = f"{uuid.uuid4().hex}.{ext}"
@@ -3932,15 +3916,14 @@ def spareparts_add(request):
             
             sparepart.save()
             
-            log_operation(request.user, 'add', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '添加备件', request.META.get('REMOTE_ADDR'))
-            messages.success(request, '备件添加成功！')
+            log_operation(request.user, 'add', f'备件: {sparepart.name}', '添加备件', request.META.get('REMOTE_ADDR'))
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    # 获取可用资产列表
-    assets = StaticAsset.objects.filter(asset_no__isnull=False).order_by('asset_no')
-    return render(request, 'cmdb/spareparts/modal_add.html', {'assets': assets})
+    # 获取备件类型列表
+    part_types = SparePartType.objects.filter(is_active=True).order_by('order')
+    return render(request, 'cmdb/spareparts/modal_add.html', {'part_types': part_types})
 
 @login_required
 def spareparts_edit(request, sparepart_id):
@@ -3950,27 +3933,40 @@ def spareparts_edit(request, sparepart_id):
     if request.method == 'POST':
         try:
             sparepart.asset_code = request.POST.get('asset_code') or None
-            sparepart.type = request.POST.get('type')
-            sparepart.related_asset_no = request.POST.get('related_asset_no') or None
-            sparepart.ip_address = request.POST.get('ip_address') or None
-            sparepart.cabinet_location = request.POST.get('cabinet_location')
+            sparepart.name = request.POST.get('name')
+            sparepart.brand = request.POST.get('brand')
+            sparepart.model = request.POST.get('model')
+            sparepart.size = request.POST.get('size')
+            sparepart.serial_number = request.POST.get('serial_number')
+            sparepart.location = request.POST.get('location')
+            sparepart.purchase_date = request.POST.get('purchase_date') or None
             
-            if sparepart.status == 'available':
-                sparepart.allocate_date = request.POST.get('allocate_date') or None
+            type_id = request.POST.get('type')
+            if type_id:
+                sparepart.type_id = type_id
             else:
-                sparepart.remove_date = request.POST.get('remove_date') or None
-                sparepart.failure_reason = request.POST.get('failure_reason')
+                sparepart.type_id = None
             
             sparepart.save()
             
-            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '编辑备件', request.META.get('REMOTE_ADDR'))
-            messages.success(request, '备件更新成功！')
+            log_operation(request.user, 'update', f'备件: {sparepart.name}', '编辑备件', request.META.get('REMOTE_ADDR'))
             return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    assets = StaticAsset.objects.filter(asset_no__isnull=False).order_by('asset_no')
-    return render(request, 'cmdb/spareparts/modal_edit.html', {'sparepart': sparepart, 'assets': assets})
+    # GET请求返回JSON数据
+    return JsonResponse({
+        'id': sparepart.id,
+        'asset_code': sparepart.asset_code,
+        'name': sparepart.name,
+        'brand': sparepart.brand,
+        'model': sparepart.model,
+        'size': sparepart.size,
+        'serial_number': sparepart.serial_number,
+        'location': sparepart.location,
+        'purchase_date': sparepart.purchase_date.isoformat() if sparepart.purchase_date else None,
+        'type_id': sparepart.type_id
+    })
 
 @login_required
 def spareparts_delete(request, sparepart_id):
@@ -3978,7 +3974,7 @@ def spareparts_delete(request, sparepart_id):
     if request.method == 'POST':
         try:
             sparepart = get_object_or_404(SparePart, id=sparepart_id)
-            target = f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}'
+            target = f'备件: {sparepart.name}'
             sparepart.delete()
             
             log_operation(request.user, 'delete', target, '删除备件', request.META.get('REMOTE_ADDR'))
@@ -3987,36 +3983,69 @@ def spareparts_delete(request, sparepart_id):
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': '只支持POST请求'})
 
+# 备件类型管理
 @login_required
-def spareparts_remove(request, sparepart_id):
-    """下架备件"""
-    if request.method == 'POST':
-        try:
-            sparepart = get_object_or_404(SparePart, id=sparepart_id)
-            sparepart.status = 'failed'
-            sparepart.remove_date = request.POST.get('remove_date') or timezone.now().date()
-            sparepart.failure_reason = request.POST.get('failure_reason', '')
-            sparepart.save()
-            
-            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '备件下架', request.META.get('REMOTE_ADDR'))
-            return JsonResponse({'success': True, 'message': '备件已下架'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+def sparepart_types_list(request):
+    """备件类型列表"""
+    types = SparePartType.objects.all().order_by('order')
+    return render(request, 'cmdb/spareparts/types_list.html', {'types': types})
 
 @login_required
-def spareparts_restore(request, sparepart_id):
-    """重新上架备件"""
+def sparepart_type_add(request):
+    """添加备件类型"""
     if request.method == 'POST':
         try:
-            sparepart = get_object_or_404(SparePart, id=sparepart_id)
-            sparepart.status = 'available'
-            sparepart.remove_date = None
-            sparepart.failure_reason = ''
-            sparepart.save()
+            name = request.POST.get('name')
+            code = request.POST.get('code')
             
-            log_operation(request.user, 'update', f'备件: {sparepart.asset_code or f"ID{sparepart.id}"}', '备件重新上架', request.META.get('REMOTE_ADDR'))
-            return JsonResponse({'success': True, 'message': '备件已重新上架'})
+            if SparePartType.objects.filter(code=code).exists():
+                return JsonResponse({'success': False, 'error': '类型代码已存在'})
+            
+            SparePartType.objects.create(name=name, code=code, order=request.POST.get('order', 0))
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return render(request, 'cmdb/spareparts/modal_type_add.html')
+
+@login_required
+def sparepart_type_edit(request, type_id):
+    """编辑备件类型"""
+    part_type = get_object_or_404(SparePartType, id=type_id)
+    
+    if request.method == 'POST':
+        try:
+            part_type.name = request.POST.get('name')
+            old_code = part_type.code
+            new_code = request.POST.get('code')
+            
+            if old_code != new_code and SparePartType.objects.filter(code=new_code).exists():
+                return JsonResponse({'success': False, 'error': '类型代码已存在'})
+            
+            part_type.code = new_code
+            part_type.order = request.POST.get('order', 0)
+            part_type.is_active = request.POST.get('is_active') == 'on'
+            part_type.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # GET请求返回JSON数据
+    return JsonResponse({
+        'id': part_type.id,
+        'name': part_type.name,
+        'code': part_type.code,
+        'order': part_type.order,
+        'is_active': part_type.is_active
+    })
+
+@login_required
+def sparepart_type_delete(request, type_id):
+    """删除备件类型"""
+    if request.method == 'POST':
+        try:
+            part_type = get_object_or_404(SparePartType, id=type_id)
+            part_type.delete()
+            return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': '只支持POST请求'})

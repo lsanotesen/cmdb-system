@@ -1,0 +1,319 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-header">
+    <h1>备件管理</h1>
+    <div class="page-actions">
+        <button class="btn btn-primary" onclick="openAddModal()">
+            <i class="fas fa-plus"></i> 添加备件
+        </button>
+        <button class="btn btn-secondary" onclick="location.href='{% url 'sparepart_types_list' %}'">
+            <i class="fas fa-cog"></i> 类型管理
+        </button>
+    </div>
+</div>
+
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>备件资产编号</th>
+                <th>名称</th>
+                <th>品牌</th>
+                <th>型号</th>
+                <th>大小/规格</th>
+                <th>序列号</th>
+                <th>存放位置</th>
+                <th>购买日期</th>
+                <th>类型</th>
+                <th>图片</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for part in spareparts %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ part.asset_code|default:"-" }}</td>
+                <td>{{ part.name }}</td>
+                <td>{{ part.brand|default:"-" }}</td>
+                <td>{{ part.model|default:"-" }}</td>
+                <td>{{ part.size|default:"-" }}</td>
+                <td>{{ part.serial_number|default:"-" }}</td>
+                <td>{{ part.location|default:"-" }}</td>
+                <td>{{ part.purchase_date|date:"Y-m-d"|default:"-" }}</td>
+                <td>{{ part.type.name|default:"-" }}</td>
+                <td>
+                    {% if part.images %}
+                        {% for img in part.get_images_list %}
+                            <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px;">
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-edit" onclick="openEditModal({{ part.id }})">编辑</button>
+                    <button class="btn btn-sm btn-delete" onclick="deleteSparePart({{ part.id }})">删除</button>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="12" class="text-center">暂无备件数据</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 添加备件弹窗 -->
+<div class="modal" id="addModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>添加备件</h2>
+            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+        </div>
+        <form id="addForm" enctype="multipart/form-data">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>备件资产编号（可选）</label>
+                    <input type="text" name="asset_code" placeholder="如 HD-2025-001">
+                </div>
+                <div class="form-group">
+                    <label>备件名称 *</label>
+                    <input type="text" name="name" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>品牌</label>
+                    <input type="text" name="brand" placeholder="如 Dell">
+                </div>
+                <div class="form-group">
+                    <label>型号</label>
+                    <input type="text" name="model" placeholder="如 XPS-15">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>大小/规格</label>
+                    <input type="text" name="size" placeholder="如 1TB">
+                </div>
+                <div class="form-group">
+                    <label>序列号</label>
+                    <input type="text" name="serial_number" placeholder="设备序列号">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>存放位置</label>
+                    <input type="text" name="location" placeholder="如 机房A-机柜01">
+                </div>
+                <div class="form-group">
+                    <label>购买日期</label>
+                    <input type="date" name="purchase_date">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>备件类型</label>
+                    <select name="type">
+                        <option value="">请选择类型</option>
+                        {% for type in part_types %}
+                        <option value="{{ type.id }}">{{ type.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>图片上传</label>
+                    <input type="file" name="image" accept="image/*" multiple>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 编辑备件弹窗 -->
+<div class="modal" id="editModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>编辑备件</h2>
+            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+        </div>
+        <form id="editForm" enctype="multipart/form-data">
+            <input type="hidden" name="sparepart_id" id="edit_sparepart_id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>备件资产编号（可选）</label>
+                    <input type="text" name="asset_code" id="edit_asset_code">
+                </div>
+                <div class="form-group">
+                    <label>备件名称 *</label>
+                    <input type="text" name="name" id="edit_name" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>品牌</label>
+                    <input type="text" name="brand" id="edit_brand">
+                </div>
+                <div class="form-group">
+                    <label>型号</label>
+                    <input type="text" name="model" id="edit_model">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>大小/规格</label>
+                    <input type="text" name="size" id="edit_size">
+                </div>
+                <div class="form-group">
+                    <label>序列号</label>
+                    <input type="text" name="serial_number" id="edit_serial_number">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>存放位置</label>
+                    <input type="text" name="location" id="edit_location">
+                </div>
+                <div class="form-group">
+                    <label>购买日期</label>
+                    <input type="date" name="purchase_date" id="edit_purchase_date">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>备件类型</label>
+                    <select name="type" id="edit_type">
+                        <option value="">请选择类型</option>
+                        {% for type in part_types %}
+                        <option value="{{ type.id }}">{{ type.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('editModal')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    fetch('{% url 'spareparts_add' %}')
+    .then(response => response.text())
+    .then(data => {
+        document.getElementById('addModal').style.display = 'block';
+    });
+}
+
+function openEditModal(id) {
+    fetch(`/cmdb/spareparts/${id}/edit/`)
+    .then(response => response.text())
+    .then(data => {
+        document.getElementById('editModal').style.display = 'block';
+        // 需要从服务器获取数据
+        fetchSparePartData(id);
+    });
+}
+
+function fetchSparePartData(id) {
+    fetch(`/cmdb/spareparts/${id}/edit/`)
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('edit_sparepart_id').value = data.id;
+        document.getElementById('edit_asset_code').value = data.asset_code || '';
+        document.getElementById('edit_name').value = data.name;
+        document.getElementById('edit_brand').value = data.brand || '';
+        document.getElementById('edit_model').value = data.model || '';
+        document.getElementById('edit_size').value = data.size || '';
+        document.getElementById('edit_serial_number').value = data.serial_number || '';
+        document.getElementById('edit_location').value = data.location || '';
+        document.getElementById('edit_purchase_date').value = data.purchase_date || '';
+        document.getElementById('edit_type').value = data.type_id || '';
+    });
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+document.getElementById('addForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('{% url 'spareparts_add' %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+});
+
+document.getElementById('editForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const id = document.getElementById('edit_sparepart_id').value;
+    
+    fetch(`/cmdb/spareparts/${id}/edit/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+});
+
+function deleteSparePart(id) {
+    if (confirm('确定要删除这个备件吗？')) {
+        fetch(`/cmdb/spareparts/${id}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+}
+
+// 关闭弹窗
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

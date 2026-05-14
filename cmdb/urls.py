@@ -109,15 +109,14 @@ urlpatterns = [
     path('backup/config/save/', views.save_backup_config_api, name='save_backup_config'),
 
     # 备件管理
-    path('spareparts/available/', views.spareparts_available, name='spareparts_available'),
-    path('spareparts/failed/', views.spareparts_failed, name='spareparts_failed'),
+    path('spareparts/', views.spareparts_list, name='spareparts_list'),
     path('spareparts/add/', views.spareparts_add, name='spareparts_add'),
     path('spareparts/<int:sparepart_id>/edit/', views.spareparts_edit, name='spareparts_edit'),
     path('spareparts/<int:sparepart_id>/delete/', views.spareparts_delete, name='spareparts_delete'),
-    path('spareparts/<int:sparepart_id>/remove/', views.spareparts_remove, name='spareparts_remove'),
-    path('spareparts/<int:sparepart_id>/restore/', views.spareparts_restore, name='spareparts_restore'),
     
-    # 备件相关API
-    path('api/assets/list/', views.api_get_assets, name='api_get_assets'),
-    path('api/assets/<str:asset_no>/', views.api_get_asset_info, name='api_get_asset_info'),
+    # 备件类型管理
+    path('spareparts/types/', views.sparepart_types_list, name='sparepart_types_list'),
+    path('spareparts/type/add/', views.sparepart_type_add, name='sparepart_type_add'),
+    path('spareparts/type/<int:type_id>/edit/', views.sparepart_type_edit, name='sparepart_type_edit'),
+    path('spareparts/type/<int:type_id>/delete/', views.sparepart_type_delete, name='sparepart_type_delete'),
 ]
