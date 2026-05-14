@@ -121,14 +121,14 @@
 
 <script>
 function openAddModal() {
-    document.getElementById('addModal').style.display = 'block';
+    document.getElementById('addModal').style.display = 'flex';
 }
 
 function openEditModal(id) {
     fetch(`/cmdb/spareparts/type/${id}/edit/`)
     .then(response => response.text())
     .then(data => {
-        document.getElementById('editModal').style.display = 'block';
+        document.getElementById('editModal').style.display = 'flex';
         fetchTypeData(id);
     });
 }
