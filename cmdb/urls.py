@@ -119,4 +119,23 @@ urlpatterns = [
     path('spareparts/type/add/', views.sparepart_type_add, name='sparepart_type_add'),
     path('spareparts/type/<int:type_id>/edit/', views.sparepart_type_edit, name='sparepart_type_edit'),
     path('spareparts/type/<int:type_id>/delete/', views.sparepart_type_delete, name='sparepart_type_delete'),
+
+    # 资产关系管理
+    path('asset_relations/', views.asset_relation_list, name='asset_relation_list'),
+    path('asset_relations/<int:relation_id>/', views.asset_relation_detail, name='asset_relation_detail'),
+    
+    # 生命周期管理
+    path('lifecycle/', views.lifecycle_event_list, name='lifecycle_event_list'),
+    
+    # 组件历史查询
+    path('component_history/<int:host_id>/', views.component_history, name='component_history'),
+    
+    # API接口
+    path('api/host_children/<int:host_id>/', views.api_get_host_children, name='api_get_host_children'),
+    path('api/install_component/', views.api_install_component, name='api_install_component'),
+    path('api/uninstall_component/', views.api_uninstall_component, name='api_uninstall_component'),
+    path('api/install_history/<int:relation_id>/', views.api_get_install_history, name='api_get_install_history'),
+    path('api/install_sparepart/', views.api_install_sparepart, name='api_install_sparepart'),
+    path('api/lifecycle_events/<int:host_id>/', views.api_get_lifecycle_events, name='api_get_lifecycle_events'),
+    path('api/add_lifecycle_event/', views.api_add_lifecycle_event, name='api_add_lifecycle_event'),
 ]

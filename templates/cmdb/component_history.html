@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+
+{% block title %}组件历史去向{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">组件历史去向</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="#">首页</a></li>
+                        <li class="breadcrumb-item active">组件历史</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">组件：{{ component.name }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="detail-item">
+                                <label>型号</label>
+                                <span>{{ component.model|default:"-" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="detail-item">
+                                <label>序列号</label>
+                                <span>{{ component.serial_number|default:"-" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="detail-item">
+                                <label>资产编号</label>
+                                <span>{{ component.asset_no|default:"-" }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h4 class="mb-3">历史安装记录</h4>
+                    {% if history %}
+                    <div class="timeline">
+                        {% for record in history %}
+                        <div class="time-label">
+                            <span class="bg-blue">{{ record.install_time|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <div>
+                            <i class="fas fa-server bg-green"></i>
+                            <div class="timeline-item">
+                                <h3 class="timeline-header">
+                                    <a href="{% url 'host_detail' record.parent_asset.id %}">{{ record.parent_asset.name }}</a>
+                                    {% if record.slot %}
+                                    <span class="ml-2">({{ record.slot }})</span>
+                                    {% endif %}
+                                </h3>
+                                <div class="timeline-body">
+                                    <p><strong>安装时间：</strong>{{ record.install_time|date:"Y-m-d H:i:s" }}</p>
+                                    {% if record.uninstall_time %}
+                                    <p><strong>拆卸时间：</strong>{{ record.uninstall_time|date:"Y-m-d H:i:s" }}</p>
+                                    {% else %}
+                                    <p><span class="badge bg-green">当前正在使用中</span></p>
+                                    {% endif %}
+                                    <p><strong>操作人：</strong>{{ record.operator.username|default:"-" }}</p>
+                                    {% if record.remark %}
+                                    <p><strong>备注：</strong>{{ record.remark }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-center text-muted">暂无安装历史记录</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

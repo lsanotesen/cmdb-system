@@ -56,6 +56,12 @@
         .btn-secondary:hover { border-color: #1890ff; color: #1890ff; }
         .btn-sm { padding: 5px 10px; font-size: 12px; }
         .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-edit { background: #1890ff; color: #fff; border: none; border-radius: 4px; }
+        .btn-edit:hover { background: #096dd9; }
+        .btn-delete { background: #ff4d4f; color: #fff; border: none; border-radius: 4px; }
+        .btn-delete:hover { background: #cf1322; }
+        .btn-install { background: #52c41a; color: #fff; border: none; border-radius: 4px; }
+        .btn-install:hover { background: #389e0d; }
         
         /* 表格样式 */
         table { width: 100%; border-collapse: collapse; background: #fff; }
@@ -296,6 +302,18 @@
                             <span>备件管理</span>
                         </a>
                     </div>
+                    <div class="nav-item">
+                        <a href="{% url 'asset_relation_list' %}" {% if '/cmdb/asset_relations' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-link"></i>
+                            <span>资产关系</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'lifecycle_event_list' %}" {% if '/cmdb/lifecycle' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-history"></i>
+                            <span>生命周期</span>
+                        </a>
+                    </div>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">硬件采集</div>
@@ -355,7 +373,7 @@
                         <a href="{% url 'cmdb_index' %}">首页</a>
                         {% if request.path != '/cmdb/' and request.path != '/cmdb' %}
                         <span>/</span>
-                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% elif '/spareparts' in request.path %}备件管理{% endif %}</span>
+                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% elif '/spareparts' in request.path %}备件管理{% elif '/asset_relations' in request.path %}资产关系{% elif '/lifecycle' in request.path %}生命周期{% elif '/component_history' in request.path %}组件历史{% endif %}</span>
                         {% endif %}
                     </div>
                 </div>

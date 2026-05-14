@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
-from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType
+from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType, AssetRelation, InstallHistory, LifecycleEvent
 from django.utils import timezone
 from .scheduler import update_scheduler_job
 import paramiko
@@ -3873,8 +3873,12 @@ def permission_management(request):
 def spareparts_list(request):
     """备件列表页面"""
     spareparts = SparePart.objects.all().order_by('-created_at')
+    hosts = Host.objects.filter(is_active=True).order_by('name')
+    part_types = SparePartType.objects.filter(is_active=True).order_by('order')
     return render(request, 'cmdb/spareparts/list.html', {
-        'spareparts': spareparts
+        'spareparts': spareparts,
+        'hosts': hosts,
+        'part_types': part_types
     })
 
 @login_required
@@ -4074,3 +4078,345 @@ def api_get_asset_info(request, asset_no):
 # 测试侧边栏页面
 def test_sidebar(request):
     return render(request, 'test_sidebar.html')
+
+
+# ==================== 资产关系管理 ====================
+
+@login_required
+def asset_relation_list(request):
+    """资产关系列表页面"""
+    relations = AssetRelation.objects.filter(is_active=True).select_related('parent_asset', 'child_asset')
+    return render(request, 'cmdb/asset_relation/list.html', {'relations': relations})
+
+
+@login_required
+def asset_relation_detail(request, relation_id):
+    """资产关系详情"""
+    relation = get_object_or_404(AssetRelation, id=relation_id)
+    histories = InstallHistory.objects.filter(asset_relation=relation).order_by('-install_time')
+    return render(request, 'cmdb/asset_relation/detail.html', {
+        'relation': relation,
+        'histories': histories
+    })
+
+
+@login_required
+def api_get_host_children(request, host_id):
+    """获取主机的子资产列表"""
+    relations = AssetRelation.objects.filter(parent_asset_id=host_id, is_active=True)\
+        .select_related('child_asset')
+    children = []
+    for rel in relations:
+        children.append({
+            'id': rel.child_asset.id,
+            'name': rel.child_asset.name,
+            'model': rel.child_asset.model,
+            'serial_number': rel.child_asset.serial_number,
+            'slot': rel.slot,
+            'is_removable': rel.is_removable,
+            'relation_id': rel.id
+        })
+    return JsonResponse({'children': children})
+
+
+@login_required
+def api_install_component(request):
+    """安装组件到主资产"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            parent_host_id = data.get('parent_host_id')
+            child_host_id = data.get('child_host_id')
+            slot = data.get('slot')
+            remark = data.get('remark', '')
+
+            # 并发保护检查
+            with transaction.atomic():
+                # 检查子资产是否已安装
+                existing_relation = AssetRelation.objects.select_for_update()\
+                    .filter(child_asset_id=child_host_id, is_active=True).first()
+                if existing_relation:
+                    return JsonResponse({'success': False, 'error': '该组件已安装在其他资产上'})
+
+                # 检查槽位是否被占用
+                slot_occupied = AssetRelation.objects.select_for_update()\
+                    .filter(parent_asset_id=parent_host_id, slot=slot, is_active=True).exists()
+                if slot_occupied:
+                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
+
+                # 创建资产关系
+                relation = AssetRelation.objects.create(
+                    parent_asset_id=parent_host_id,
+                    child_asset_id=child_host_id,
+                    slot=slot,
+                    is_removable=True,
+                    is_active=True
+                )
+
+                # 创建安装历史
+                InstallHistory.objects.create(
+                    asset_relation=relation,
+                    install_time=timezone.now(),
+                    operator=request.user,
+                    operation_type='install',
+                    remark=remark
+                )
+
+                # 添加生命周期事件
+                LifecycleEvent.objects.create(
+                    asset_id=child_host_id,
+                    event_type='deploy',
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=f'安装到主机 {relation.parent_asset.name} 的 {slot} 槽位'
+                )
+
+            return JsonResponse({'success': True, 'relation_id': relation.id})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_uninstall_component(request):
+    """拆卸组件"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            action = data.get('action')  # 'return_to_spare' 或 'scrap'
+            remark = data.get('remark', '')
+
+            with transaction.atomic():
+                relation = AssetRelation.objects.select_for_update().get(id=relation_id)
+                
+                # 更新资产关系状态
+                relation.is_active = False
+                relation.save()
+
+                # 更新安装历史
+                history = InstallHistory.objects.filter(asset_relation=relation, uninstall_time__isnull=True).first()
+                if history:
+                    history.uninstall_time = timezone.now()
+                    history.operation_type = 'uninstall'
+                    history.remark = remark
+                    history.save()
+                else:
+                    InstallHistory.objects.create(
+                        asset_relation=relation,
+                        install_time=relation.created_at,
+                        uninstall_time=timezone.now(),
+                        operator=request.user,
+                        operation_type='uninstall',
+                        remark=remark
+                    )
+
+                # 添加生命周期事件
+                event_type = 'uninstall' if action == 'return_to_spare' else 'scrap'
+                LifecycleEvent.objects.create(
+                    asset=relation.child_asset,
+                    event_type=event_type,
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=remark
+                )
+
+            return JsonResponse({'success': True})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_get_install_history(request, relation_id):
+    """获取安装历史"""
+    try:
+        histories = InstallHistory.objects.filter(asset_relation_id=relation_id)\
+            .select_related('operator').order_by('-install_time')
+        result = []
+        for h in histories:
+            result.append({
+                'id': h.id,
+                'install_time': h.install_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'uninstall_time': h.uninstall_time.strftime('%Y-%m-%d %H:%M:%S') if h.uninstall_time else '',
+                'operator': h.operator.username if h.operator else '',
+                'operation_type': h.get_operation_type_display(),
+                'remark': h.remark
+            })
+        return JsonResponse({'histories': result})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+# ==================== 备件安装 ====================
+
+@login_required
+def api_install_sparepart(request):
+    """从备件库安装备件到资产"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            sparepart_id = data.get('sparepart_id')
+            parent_host_id = data.get('parent_host_id')
+            slot = data.get('slot')
+            remark = data.get('remark', '')
+
+            with transaction.atomic():
+                # 检查备件状态
+                sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
+                if sparepart.status != 'in_stock':
+                    return JsonResponse({'success': False, 'error': '备件不在库存中'})
+
+                # 检查槽位是否被占用
+                slot_occupied = AssetRelation.objects.select_for_update()\
+                    .filter(parent_asset_id=parent_host_id, slot=slot, is_active=True).exists()
+                if slot_occupied:
+                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
+
+                # 检查主机是否存在
+                parent_host = Host.objects.get(id=parent_host_id)
+
+                # 创建资产关系（子资产用备件名称创建临时记录，或者需要先在Host中创建记录）
+                # 这里我们假设备件对应的组件已经在Host中存在，或者需要创建
+                # 为了简化，我们直接创建资产关系，使用备件信息
+
+                # 创建子资产Host记录（如果不存在）
+                child_host, created = Host.objects.get_or_create(
+                    name=sparepart.name,
+                    defaults={
+                        'model': sparepart.model,
+                        'serial_number': sparepart.serial_number,
+                        'idc': parent_host.idc,
+                        'cabinet': parent_host.cabinet,
+                    }
+                )
+
+                # 创建资产关系
+                relation = AssetRelation.objects.create(
+                    parent_asset=parent_host,
+                    child_asset=child_host,
+                    slot=slot,
+                    is_removable=True,
+                    is_active=True
+                )
+
+                # 创建安装历史
+                InstallHistory.objects.create(
+                    asset_relation=relation,
+                    install_time=timezone.now(),
+                    operator=request.user,
+                    operation_type='install',
+                    remark=remark
+                )
+
+                # 更新备件状态
+                sparepart.status = 'installed'
+                sparepart.is_installed = True
+                sparepart.installed_host_id = parent_host_id
+                sparepart.installed_slot = slot
+                sparepart.save()
+
+                # 添加生命周期事件
+                LifecycleEvent.objects.create(
+                    asset=child_host,
+                    event_type='deploy',
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=f'从备件库安装到主机 {parent_host.name} 的 {slot} 槽位'
+                )
+
+            return JsonResponse({'success': True, 'relation_id': relation.id})
+        except SparePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '备件不存在'})
+        except Host.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '主机不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+# ==================== 生命周期管理 ====================
+
+@login_required
+def lifecycle_event_list(request):
+    """生命周期事件列表页面"""
+    events = LifecycleEvent.objects.select_related('asset', 'operator')\
+        .order_by('-event_time')
+    return render(request, 'cmdb/lifecycle/list.html', {'events': events})
+
+
+@login_required
+def api_get_lifecycle_events(request, host_id):
+    """获取资产的生命周期事件"""
+    events = LifecycleEvent.objects.filter(asset_id=host_id)\
+        .select_related('operator').order_by('-event_time')
+    result = []
+    for event in events:
+        result.append({
+            'id': event.id,
+            'event_type': event.get_event_type_display(),
+            'event_time': event.event_time.strftime('%Y-%m-%d %H:%M:%S'),
+            'operator': event.operator.username if event.operator else '',
+            'remark': event.remark
+        })
+    return JsonResponse({'events': result})
+
+
+@login_required
+def api_add_lifecycle_event(request):
+    """添加生命周期事件"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            asset_id = data.get('asset_id')
+            event_type = data.get('event_type')
+            remark = data.get('remark', '')
+
+            event = LifecycleEvent.objects.create(
+                asset_id=asset_id,
+                event_type=event_type,
+                event_time=timezone.now(),
+                operator=request.user,
+                remark=remark
+            )
+            return JsonResponse({'success': True, 'event_id': event.id})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+# ==================== 组件历史查询 ====================
+
+@login_required
+def component_history(request, host_id):
+    """组件历史去向查询"""
+    host = get_object_or_404(Host, id=host_id)
+    
+    # 查询该组件作为子资产的所有历史关系
+    relations = AssetRelation.objects.filter(child_asset=host)\
+        .select_related('parent_asset')
+    
+    # 获取所有安装历史
+    history_data = []
+    for rel in relations:
+        histories = InstallHistory.objects.filter(asset_relation=rel)\
+            .select_related('operator').order_by('install_time')
+        for h in histories:
+            history_data.append({
+                'parent_asset': rel.parent_asset,
+                'slot': rel.slot,
+                'install_time': h.install_time,
+                'uninstall_time': h.uninstall_time,
+                'operator': h.operator,
+                'operation_type': h.operation_type,
+                'remark': h.remark
+            })
+    
+    history_data.sort(key=lambda x: x['install_time'], reverse=True)
+    
+    return render(request, 'cmdb/component_history.html', {
+        'component': host,
+        'history': history_data
+    })

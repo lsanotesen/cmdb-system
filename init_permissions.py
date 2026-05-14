@@ -23,9 +23,12 @@ def init_permissions():
         {'name': '批量命令', 'code': 'batch_command', 'order': 9},
         {'name': '采集任务', 'code': 'collect', 'order': 10},
         {'name': '数据库备份', 'code': 'backup', 'order': 11},
-        {'name': '系统设置', 'code': 'settings', 'order': 12},
-        {'name': '用户管理', 'code': 'user', 'order': 13},
-        {'name': '角色管理', 'code': 'role', 'order': 14},
+        {'name': '备件管理', 'code': 'sparepart', 'order': 12},
+        {'name': '资产关系', 'code': 'asset_relation', 'order': 13},
+        {'name': '生命周期', 'code': 'lifecycle', 'order': 14},
+        {'name': '系统设置', 'code': 'settings', 'order': 15},
+        {'name': '用户管理', 'code': 'user', 'order': 16},
+        {'name': '角色管理', 'code': 'role', 'order': 17},
     ]
 
     for module_data in modules_data:

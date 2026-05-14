@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+{% block title %}生命周期管理{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">生命周期管理</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="#">首页</a></li>
+                        <li class="breadcrumb-item active">生命周期</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="container-fluid">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">生命周期事件列表</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>资产名称</th>
+                                <th>事件类型</th>
+                                <th>事件时间</th>
+                                <th>操作人</th>
+                                <th>备注</th>
+                                <th>记录时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td><a href="{% url 'host_detail' event.asset.id %}">{{ event.asset.name }}</a></td>
+                                <td>
+                                    {% if event.event_type == 'purchase' %}<span class="badge bg-blue">采购</span>{% endif %}
+                                    {% if event.event_type == 'deploy' %}<span class="badge bg-green">上架</span>{% endif %}
+                                    {% if event.event_type == 'maintenance' %}<span class="badge bg-yellow">维护</span>{% endif %}
+                                    {% if event.event_type == 'repair' %}<span class="badge bg-orange">维修</span>{% endif %}
+                                    {% if event.event_type == 'uninstall' %}<span class="badge bg-gray">下架</span>{% endif %}
+                                    {% if event.event_type == 'reinstall' %}<span class="badge bg-teal">重新上架</span>{% endif %}
+                                    {% if event.event_type == 'scrap' %}<span class="badge bg-red">报废</span>{% endif %}
+                                </td>
+                                <td>{{ event.event_time|date:"Y-m-d H:i" }}</td>
+                                <td>{{ event.operator.username|default:"-" }}</td>
+                                <td>{{ event.remark|default:"-" }}</td>
+                                <td>{{ event.created_at|date:"Y-m-d H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center">暂无生命周期事件记录</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

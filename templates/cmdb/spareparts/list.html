@@ -56,6 +56,9 @@
                 <td>
                     <button class="btn btn-sm btn-edit" onclick="openEditModal({{ part.id }})">编辑</button>
                     <button class="btn btn-sm btn-delete" onclick="deleteSparePart({{ part.id }})">删除</button>
+                    {% if part.status == 'in_stock' %}
+                    <button class="btn btn-sm btn-install" onclick="openInstallModal({{ part.id }})">安装到资产</button>
+                    {% endif %}
                 </td>
             </tr>
             {% empty %}
@@ -133,6 +136,44 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')">取消</button>
                 <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 安装备件弹窗 -->
+<div class="modal" id="installModal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>安装备件到资产</h2>
+            <button class="modal-close" onclick="closeModal('installModal')">&times;</button>
+        </div>
+        <form id="installForm">
+            <input type="hidden" name="sparepart_id" id="install_sparepart_id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>目标服务器 *</label>
+                    <select name="parent_host_id" id="install_host_id" required>
+                        <option value="">请选择服务器</option>
+                        {% for host in hosts %}
+                        <option value="{{ host.id }}">{{ host.name }} ({{ host.asset_no|default:"无资产编号" }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>安装槽位 *</label>
+                    <input type="text" name="slot" id="install_slot" placeholder="如 PCIe Slot 1" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>安装备注</label>
+                    <textarea name="remark" id="install_remark" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('installModal')">取消</button>
+                <button type="submit" class="btn btn-primary">确认安装</button>
             </div>
         </form>
     </div>
@@ -308,6 +349,32 @@ function deleteSparePart(id) {
         });
     }
 }
+
+function openInstallModal(id) {
+    document.getElementById('install_sparepart_id').value = id;
+    document.getElementById('installModal').style.display = 'flex';
+}
+
+document.getElementById('installForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    
+    fetch('{% url 'api_install_sparepart' %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+});
 
 // 关闭弹窗
 window.onclick = function(event) {

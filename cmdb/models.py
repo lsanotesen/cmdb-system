@@ -355,6 +355,12 @@ class SparePartType(models.Model):
 
 class SparePart(models.Model):
     """备件模型"""
+    STATUS_CHOICES = [
+        ('in_stock', '库存中'),
+        ('installed', '已安装'),
+        ('scrapped', '已报废'),
+        ('maintenance', '维修中'),
+    ]
     asset_code = models.CharField('备件资产编号', max_length=100, blank=True, null=True, help_text='如 HD-2025-001，可选')
     name = models.CharField('备件名称', max_length=100)
     brand = models.CharField('品牌', max_length=100, blank=True)
@@ -365,6 +371,10 @@ class SparePart(models.Model):
     purchase_date = models.DateField('购买日期', blank=True, null=True)
     type = models.ForeignKey('SparePartType', verbose_name='备件类型', on_delete=models.SET_NULL, null=True, blank=True)
     images = models.TextField('图片路径JSON', blank=True)
+    status = models.CharField('状态', max_length=20, choices=STATUS_CHOICES, default='in_stock')
+    is_installed = models.BooleanField('是否已安装', default=False)
+    installed_host_id = models.IntegerField('安装主机ID', blank=True, null=True)
+    installed_slot = models.CharField('安装槽位', max_length=100, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
@@ -382,7 +392,77 @@ class SparePart(models.Model):
                 return json.loads(self.images)
             except:
                 return []
-        return []
+
+
+class AssetRelation(models.Model):
+    """资产关系模型 - 主资产与子资产的关系"""
+    parent_asset = models.ForeignKey('Host', verbose_name='主资产（服务器）', on_delete=models.CASCADE, related_name='child_relations')
+    child_asset = models.ForeignKey('Host', verbose_name='子资产（组件）', on_delete=models.CASCADE, related_name='parent_relations')
+    slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
+    is_removable = models.BooleanField('是否可拆卸', default=True)
+    is_active = models.BooleanField('是否有效', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    def __str__(self):
+        return f'{self.parent_asset} -> {self.child_asset} ({self.slot})'
+
+    class Meta:
+        verbose_name = '资产关系'
+        verbose_name_plural = '资产关系管理'
+        unique_together = [('parent_asset', 'slot')]
+
+
+class InstallHistory(models.Model):
+    """安装历史模型"""
+    OPERATION_TYPES = [
+        ('install', '安装'),
+        ('uninstall', '拆卸'),
+        ('replacement', '更换'),
+        ('expansion', '扩容'),
+        ('maintenance', '维护'),
+    ]
+    asset_relation = models.ForeignKey('AssetRelation', verbose_name='资产关系', on_delete=models.CASCADE, related_name='install_histories')
+    install_time = models.DateTimeField('安装时间')
+    uninstall_time = models.DateTimeField('拆卸时间', blank=True, null=True)
+    operator = models.ForeignKey(User, verbose_name='操作人', on_delete=models.SET_NULL, null=True, blank=True)
+    operation_type = models.CharField('操作类型', max_length=20, choices=OPERATION_TYPES)
+    remark = models.TextField('备注', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.operation_type} - {self.asset_relation}'
+
+    class Meta:
+        verbose_name = '安装历史'
+        verbose_name_plural = '安装历史管理'
+
+
+class LifecycleEvent(models.Model):
+    """生命周期事件模型"""
+    EVENT_TYPES = [
+        ('purchase', '采购'),
+        ('deploy', '上架'),
+        ('maintenance', '维护'),
+        ('repair', '维修'),
+        ('uninstall', '下架'),
+        ('reinstall', '重新上架'),
+        ('scrap', '报废'),
+    ]
+    asset = models.ForeignKey('Host', verbose_name='资产', on_delete=models.CASCADE, related_name='lifecycle_events')
+    event_type = models.CharField('事件类型', max_length=20, choices=EVENT_TYPES)
+    event_time = models.DateTimeField('事件时间')
+    operator = models.ForeignKey(User, verbose_name='操作人', on_delete=models.SET_NULL, null=True, blank=True)
+    remark = models.TextField('备注', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.asset} - {self.get_event_type_display()}'
+
+    class Meta:
+        verbose_name = '生命周期事件'
+        verbose_name_plural = '生命周期管理'
+
 
 class Role(models.Model):
     """角色模型"""
