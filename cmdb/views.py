@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
-from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart
+from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType
 from django.utils import timezone
 from .scheduler import update_scheduler_job
 import paramiko
