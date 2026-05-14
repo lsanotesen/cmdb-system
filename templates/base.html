@@ -199,6 +199,12 @@
                         </a>
                     </div>
                     {% endif %}
+                    <div class="nav-item">
+                        <a href="{% url 'spareparts_available' %}" {% if '/cmdb/spareparts' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-wrench"></i>
+                            <span>备件管理</span>
+                        </a>
+                    </div>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">硬件采集</div>
@@ -237,12 +243,6 @@
                         </a>
                     </div>
                     {% endif %}
-                    <div class="nav-item">
-                        <a href="{% url 'spareparts_available' %}" {% if '/cmdb/spareparts' in request.path %}class="active"{% endif %}>
-                            <i class="icon fas fa-wrench"></i>
-                            <span>备件管理</span>
-                        </a>
-                    </div>
                 </div>
                 {% if user.is_superuser %}
                 <div class="nav-section">

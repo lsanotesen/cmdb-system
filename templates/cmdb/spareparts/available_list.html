@@ -40,18 +40,18 @@
                         <tbody>
                             {% for part in spareparts %}
                             <tr>
-                                <td>{{ part.asset_code or '-' }}</td>
+                                <td>{{ part.asset_code|default:"-" }}</td>
                                 <td>{{ part.get_type_display }}</td>
                                 <td>
                                     {% if part.related_asset %}
                                     {{ part.related_asset.asset_no }} - {{ part.related_asset.device_model }}
                                     {% else %}
-                                    {{ part.related_asset_no or '-' }}
+                                    {{ part.related_asset_no|default:"-" }}
                                     {% endif %}
                                 </td>
-                                <td>{{ part.ip_address or '-' }}</td>
-                                <td>{{ part.cabinet_location or '-' }}</td>
-                                <td>{{ part.allocate_date|date:"Y-m-d" if part.allocate_date else '-' }}</td>
+                                <td>{{ part.ip_address|default:"-" }}</td>
+                                <td>{{ part.cabinet_location|default:"-" }}</td>
+                                <td>{{ part.allocate_date|date:"Y-m-d"|default:"-" }}</td>
                                 <td>
                                     {% if part.get_images_list %}
                                     <img src="{{ part.get_images_list.0 }}" width="50" height="50" class="img-thumbnail">
