@@ -80,17 +80,21 @@ cd cmdb-system
 
 #### 2. 创建必要目录并设置权限
 
+**方式一：逐行执行（推荐）**
+
 ```bash
-# 创建数据库数据目录
 sudo mkdir -p /data01/mysql_data
-# 创建数据库备份目录
 sudo mkdir -p /data01/db_backup
-# 设置目录权限
 sudo chown -R 1000:1000 /data01/mysql_data
 sudo chown -R 1000:1000 /data01/db_backup
 sudo chmod -R 755 /data01/mysql_data
 sudo chmod -R 755 /data01/db_backup
+```
 
+**方式二：单行执行（复制粘贴更可靠）**
+
+```bash
+sudo mkdir -p /data01/mysql_data /data01/db_backup && sudo chown -R 1000:1000 /data01/mysql_data /data01/db_backup && sudo chmod -R 755 /data01/mysql_data /data01/db_backup
 ```
 
 **说明**：
