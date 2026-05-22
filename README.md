@@ -90,6 +90,7 @@ sudo chown -R 1000:1000 /data01/mysql_data
 sudo chown -R 1000:1000 /data01/db_backup
 sudo chmod -R 755 /data01/mysql_data
 sudo chmod -R 755 /data01/db_backup
+
 ```
 
 **说明**：
@@ -124,8 +125,8 @@ docker-compose exec cmdb python3 manage.py createsuperuser
 #### 5. 访问系统
 
 ```
-前台: http://localhost:8001/cmdb/
-管理后台: http://localhost:8001/admin/
+系统访问地址: http://yourip:8001/cmdb/
+
 ```
 
 ### 使用 Python 直接运行
