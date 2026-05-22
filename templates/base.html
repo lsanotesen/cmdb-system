@@ -108,6 +108,14 @@
         tr:hover { background: #fafafa; }
         tr:last-child td { border-bottom: none; }
         .table-responsive { overflow-x: auto; }
+        .table-container { 
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch;
+            margin-top: 16px; 
+        }
+        .table-container table { 
+            min-width: 800px; 
+        }
         
         /* 徽章样式 */
         .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
@@ -193,19 +201,49 @@
         .actions { display: flex; gap: 5px; }
         
         /* 响应式 */
+        @media (max-width: 1200px) {
+            .sidebar { width: 200px; }
+            .main-content { margin-left: 200px; }
+            .form-row { grid-template-columns: 1fr; }
+            th, td { padding: 8px 10px; font-size: 13px; }
+        }
+        @media (max-width: 992px) {
+            .sidebar { width: 180px; }
+            .main-content { margin-left: 180px; }
+            .page-content { padding: 15px; }
+            th, td { padding: 7px 8px; font-size: 12px; }
+        }
         @media (max-width: 768px) {
             .sidebar { width: 60px; }
             .sidebar-header h1 span, .sidebar-header .subtitle, .nav-item a span:not(.icon), .nav-section-title { display: none; }
             .nav-item a { padding: 11px; justify-content: center; }
             .main-content { margin-left: 60px; }
             .topbar { padding: 12px 15px; }
-            .page-content { padding: 15px; }
+            .page-content { padding: 12px; }
+            .search-box { padding: 12px; }
+            th, td { padding: 6px 8px; font-size: 11px; }
+            .btn { padding: 6px 10px; font-size: 12px; }
+            .stat-card { padding: 15px; }
+            .stat-icon { width: 40px; height: 40px; font-size: 20px; }
+            .stat-info h3 { font-size: 22px; }
+        }
+        @media (max-width: 576px) {
+            .sidebar { position: fixed; left: -60px; z-index: 1000; transition: left 0.3s; }
+            .sidebar.open { left: 0; }
+            .main-content { margin-left: 0; }
+            .sidebar-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; display: none; }
+            .sidebar-overlay.open { display: block; }
+            .mobile-menu-btn { display: block; }
+            th, td { padding: 5px 6px; font-size: 10px; }
+            .table-container { font-size: 11px; }
+            .search-box .form-group { min-width: 120px; }
         }
     </style>
 </head>
 <body>
     <div class="layout">
-        <aside class="sidebar">
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h1><i class="fas fa-server"></i> 资产管理系统</h1>
                 <div class="subtitle">Asset Management</div>
@@ -353,6 +391,9 @@
         <main class="main-content">
             <div class="topbar">
                 <div class="topbar-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display: none; background: none; border: none; font-size: 20px; cursor: pointer; padding: 8px; color: #666;">
+                        <i class="fas fa-bars"></i>
+                    </button>
                     <div class="breadcrumb">
                         <a href="{% url 'cmdb_index' %}">首页</a>
                         {% if request.path != '/cmdb/' and request.path != '/cmdb' %}
@@ -426,6 +467,13 @@
                 menu.style.display = 'none';
                 parent.classList.remove('open');
             }
+        }
+
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            var overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
         }
 
         document.addEventListener('click', function(event) {
