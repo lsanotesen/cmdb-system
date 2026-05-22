@@ -3791,6 +3791,11 @@ def change_password(request):
 
 
 @login_required
+def user_guide(request):
+    return render(request, 'cmdb/user_guide.html')
+
+
+@login_required
 @superuser_required
 def user_management(request):
     users = User.objects.select_related('userprofile').all().order_by('-id')

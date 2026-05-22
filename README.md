@@ -78,7 +78,26 @@ git clone https://github.com/lsanotesen/cmdb-system.git
 cd cmdb-system
 ```
 
-#### 2. 启动服务
+#### 2. 创建必要目录并设置权限
+
+```bash
+# 创建数据库数据目录
+sudo mkdir -p /data01/mysql_data
+# 创建数据库备份目录
+sudo mkdir -p /data01/db_backup
+# 设置目录权限
+sudo chown -R 1000:1000 /data01/mysql_data
+sudo chown -R 1000:1000 /data01/db_backup
+sudo chmod -R 755 /data01/mysql_data
+sudo chmod -R 755 /data01/db_backup
+```
+
+**说明**：
+- `/data01/mysql_data`：用于存储数据库数据，容器内MariaDB运行用户ID为1000
+- `/data01/db_backup`：用于存储数据库备份文件
+- 请根据实际部署环境调整目录路径
+
+#### 3. 启动服务
 
 ```bash
 docker-compose up -d --build
@@ -90,7 +109,7 @@ docker-compose up -d --build
 - 数据库数据持久化存储在 `/data01/mysql_data` 目录
 - **重要**：请根据实际部署环境修改 `docker-compose.yml` 中的挂载目录路径，确保该目录存在且有写入权限
 
-#### 3. 管理员账号
+#### 4. 管理员账号
 
 **默认管理员账号**（首次部署后**自动创建**）：
 - 用户名：`admin`
@@ -102,7 +121,7 @@ docker-compose up -d --build
 docker-compose exec cmdb python3 manage.py createsuperuser
 ```
 
-#### 4. 访问系统
+#### 5. 访问系统
 
 ```
 前台: http://localhost:8001/cmdb/
