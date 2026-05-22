@@ -1,17 +1,15 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="page-header">
-    <h1>备件类型管理</h1>
-    <div class="page-actions">
-        <button class="btn btn-primary" onclick="openAddModal()">
-            <i class="fas fa-plus"></i> 添加类型
-        </button>
-        <button class="btn btn-secondary" onclick="location.href='{% url 'spareparts_list' %}'">
-            <i class="fas fa-arrow-left"></i> 返回备件列表
-        </button>
+<div class="card">
+    <div class="card-header">
+        <h2>⚙️ 备件类型管理</h2>
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="openAddModal()">➕ 添加类型</button>
+            <button class="btn btn-secondary" onclick="location.href='{% url 'spareparts_list' %}'">⬅️ 返回备件列表</button>
+        </div>
     </div>
-</div>
+    <div class="card-body">
 
 <div class="table-container">
     <table class="data-table">
@@ -50,70 +48,69 @@
 </div>
 
 <!-- 添加类型弹窗 -->
-<div class="modal" id="addModal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>添加备件类型</h2>
-            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+<div class="modal" id="addModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+    <div class="modal-content" style="background: white; border-radius: 8px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <div class="modal-header" style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 18px; text-align: center; flex: 1;">添加备件类型</h2>
+            <button class="modal-close" onclick="closeModal('addModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
         </div>
-        <form id="addForm">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>类型名称 *</label>
-                    <input type="text" name="name" required placeholder="如 硬盘">
+        <form id="addForm" style="padding: 20px;">
+            <div class="form-row" style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px;">类型名称 *</label>
+                    <input type="text" name="name" required placeholder="如 硬盘" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 </div>
-                <div class="form-group">
-                    <label>类型代码 *</label>
-                    <input type="text" name="code" required placeholder="如 hard_drive">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>排序</label>
-                    <input type="number" name="order" value="0">
+                <div class="form-group" style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px;">类型代码 *</label>
+                    <input type="text" name="code" required placeholder="如 hard_drive" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
+            <div class="form-row" style="margin-top: 15px;">
+                <div class="form-group" style="width: 50%;">
+                    <label style="display: block; margin-bottom: 5px;">排序</label>
+                    <input type="number" name="order" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('addModal')" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">取消</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- 编辑类型弹窗 -->
-<div class="modal" id="editModal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>编辑备件类型</h2>
-            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+<div class="modal" id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000;">
+    <div class="modal-content" style="background: white; border-radius: 8px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+        <div class="modal-header" style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 18px; text-align: center; flex: 1;">编辑备件类型</h2>
+            <button class="modal-close" onclick="closeModal('editModal')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
         </div>
-        <form id="editForm">
+        <form id="editForm" style="padding: 20px;">
             <input type="hidden" name="type_id" id="edit_type_id">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>类型名称 *</label>
-                    <input type="text" name="name" id="edit_name" required>
+            <div class="form-row" style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px;">类型名称 *</label>
+                    <input type="text" name="name" id="edit_name" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 </div>
-                <div class="form-group">
-                    <label>类型代码 *</label>
-                    <input type="text" name="code" id="edit_code" required>
+                <div class="form-group" style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px;">类型代码 *</label>
+                    <input type="text" name="code" id="edit_code" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>排序</label>
-                    <input type="number" name="order" id="edit_order">
+            <div class="form-row" style="display: flex; gap: 15px; margin-top: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px;">排序</label>
+                    <input type="number" name="order" id="edit_order" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
                 </div>
-                <div class="form-group">
-                    <label>启用状态</label>
+                <div class="form-group" style="flex: 1; display: flex; align-items: center; margin-top: 25px;">
                     <input type="checkbox" name="is_active" id="edit_is_active">
-                    <label for="edit_is_active">启用</label>
+                    <label for="edit_is_active" style="margin-left: 5px;">启用</label>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-cancel" onclick="closeModal('editModal')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" class="btn btn-cancel" onclick="closeModal('editModal')" style="padding: 8px 16px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">取消</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">保存</button>
             </div>
         </form>
     </div>

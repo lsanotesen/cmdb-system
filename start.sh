@@ -16,5 +16,11 @@ python3 manage.py migrate --noinput
 # 初始化权限数据
 python3 init_permissions.py
 
-# 启动 Django（设置 5 分钟超时，防止长时间操作被中断）
-gunicorn cmdb_project.wsgi:application --bind 0.0.0.0:8000 --timeout 300
+# 根据环境变量决定启动方式
+if [ "$DEBUG" = "True" ]; then
+    echo "Starting Django in development mode with auto-reload..."
+    python3 manage.py runserver 0.0.0.0:8000
+else
+    echo "Starting Django in production mode with gunicorn..."
+    gunicorn cmdb_project.wsgi:application --bind 0.0.0.0:8000 --timeout 300
+fi

@@ -5,9 +5,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}资产管理系统{% endblock %}</title>
+    {% load static %}
     {% load custom_tags %}
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="{% static 'external/bootstrap.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'external/font-awesome.min.css' %}">
     <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; background: #f5f7fa; font-size: 14px; }
@@ -29,6 +30,37 @@
         .nav-item .icon { font-size: 18px; width: 22px; text-align: center; opacity: 0.7; }
         .nav-item a:hover .icon, .nav-item a.active .icon { opacity: 1; }
         .nav-item .arrow { margin-left: auto; font-size: 12px; opacity: 0.5; }
+        
+        /* 子菜单样式 */
+        .nav-item-has-children { margin-bottom: 4px; }
+        .nav-item-parent { position: relative; }
+        .nav-arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
+        .nav-item-has-children.open .nav-arrow { transform: rotate(180deg); }
+        .nav-item-children { 
+            margin-left: 24px; 
+            padding-left: 12px; 
+            border-left: 2px solid #e8e8e8; 
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .nav-item-children a { 
+            padding: 8px 16px 8px 24px; 
+            font-size: 13px; 
+            position: relative;
+        }
+        .nav-item-children a::before { 
+            content: ''; 
+            position: absolute; 
+            left: 0; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            width: 8px; 
+            height: 8px; 
+            background: #d9d9d9; 
+            border-radius: 50%; 
+        }
+        .nav-item-children a:hover::before { background: #1890ff; }
+        .nav-item-children a.active::before { background: #1890ff; }
         
         .main-content { flex: 1; margin-left: 240px; display: flex; flex-direction: column; }
         .topbar { background: #fff; padding: 15px 25px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
@@ -62,6 +94,12 @@
         .btn-delete:hover { background: #cf1322; }
         .btn-install { background: #52c41a; color: #fff; border: none; border-radius: 4px; }
         .btn-install:hover { background: #389e0d; }
+        .btn-disable { background: #faad14; color: #fff; border: none; border-radius: 4px; }
+        .btn-disable:hover { background: #d48806; }
+        .btn-enable { background: #52c41a; color: #fff; border: none; border-radius: 4px; }
+        .btn-enable:hover { background: #389e0d; }
+        .btn-history { background: #13c2c2; color: #fff; border: none; border-radius: 4px; }
+        .btn-history:hover { background: #08979c; }
         
         /* 表格样式 */
         table { width: 100%; border-collapse: collapse; background: #fff; }
@@ -112,70 +150,6 @@
         .detail-item { padding: 15px; background: #fafafa; border-radius: 6px; }
         .detail-item label { display: block; font-size: 12px; color: #8c8c8c; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
         .detail-item span { font-size: 14px; color: #1f1f1f; font-weight: 500; }
-        
-        /* 弹窗 */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            min-height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            overflow: auto;
-        }
-        .modal.show {
-            display: flex;
-        }
-        .modal-content {
-            background: #fff;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 700px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .modal-header h2 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
-            color: #1f1f1f;
-        }
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
-        }
-        .modal-close:hover {
-            color: #666;
-        }
-        .modal form {
-            padding: 20px;
-        }
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            padding: 16px 20px;
-            border-top: 1px solid #f0f0f0;
-            margin-top: 10px;
-        }
         
         /* 表单 */
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -299,11 +273,17 @@
                     <div class="nav-item">
                         <a href="{% url 'spareparts_list' %}" {% if '/cmdb/spareparts' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-wrench"></i>
-                            <span>备件管理</span>
+                            <span>服务器备件</span>
                         </a>
                     </div>
                     <div class="nav-item">
-                        <a href="{% url 'asset_relation_list' %}" {% if '/cmdb/asset_relations' in request.path %}class="active"{% endif %}>
+                        <a href="{% url 'office_parts_list' %}" {% if '/cmdb/office_parts' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-laptop"></i>
+                            <span>办公机配件</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a href="{% url 'asset_relation_list' %}" {% if '/cmdb/asset_relations' in request.path %}{% if '/returned' in request.path %}{% else %}class="active"{% endif %}{% endif %}>
                             <i class="icon fas fa-link"></i>
                             <span>资产关系</span>
                         </a>
@@ -314,17 +294,21 @@
                             <span>生命周期</span>
                         </a>
                     </div>
+                    <div class="nav-item">
+                        <a href="{% url 'returned_devices_list' %}" {% if '/cmdb/asset_relations/returned' in request.path %}class="active"{% endif %}>
+                            <i class="icon fas fa-warehouse"></i>
+                            <span>已退库设备</span>
+                        </a>
+                    </div>
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">硬件采集</div>
-                    {% if request.user|has_module_permission:'bastion' %}
                     <div class="nav-item">
                         <a href="{% url 'bastion_list' %}" {% if '/cmdb/bastion' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-desktop"></i>
                             <span>跳板机</span>
                         </a>
                     </div>
-                    {% endif %}
                     {% if request.user|has_module_permission:'server' %}
                     <div class="nav-item">
                         <a href="{% url 'target_server_list' %}" {% if '/cmdb/server' in request.path %}class="active"{% endif %}>
@@ -353,11 +337,11 @@
                     </div>
                     {% endif %}
                 </div>
-                {% if user.is_superuser %}
+                {% if user.is_superuser or user.userprofile.is_admin %}
                 <div class="nav-section">
                     <div class="nav-section-title">系统设置</div>
                     <div class="nav-item">
-                        <a href="{% url 'user_management' %}" {% if '/cmdb/settings' in request.path %}class="active"{% endif %}>
+                        <a href="{% url 'user_management' %}" {% if '/cmdb/settings' in request.path or '/cmdb/users' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-cog"></i>
                             <span>系统设置</span>
                         </a>
@@ -373,7 +357,7 @@
                         <a href="{% url 'cmdb_index' %}">首页</a>
                         {% if request.path != '/cmdb/' and request.path != '/cmdb' %}
                         <span>/</span>
-                        <span>{% if '/asset' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% elif '/spareparts' in request.path %}备件管理{% elif '/asset_relations' in request.path %}资产关系{% elif '/lifecycle' in request.path %}生命周期{% elif '/component_history' in request.path %}组件历史{% endif %}</span>
+                        <span>{% if '/asset' in request.path and not '/asset_relations/returned' in request.path %}资产管理{% elif '/idc' in request.path %}机房管理{% elif '/cabinet' in request.path %}机柜管理{% elif '/group' in request.path %}资产组{% elif '/static/assets' in request.path %}静态资产{% elif '/server' in request.path %}服务器管理{% elif '/bastion' in request.path %}跳板机{% elif '/collect' in request.path %}采集任务{% elif '/backup' in request.path %}数据备份{% elif '/office_parts' in request.path %}办公机配件{% elif '/spareparts' in request.path %}服务器备件{% elif '/asset_relations/returned' in request.path %}已退库设备{% elif '/asset_relations' in request.path %}资产关系{% elif '/lifecycle' in request.path %}生命周期{% elif '/component_history' in request.path %}组件历史{% endif %}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -386,7 +370,7 @@
                             <i class="fas fa-chevron-down" style="font-size: 12px;"></i>
                         </a>
                         <div id="userDropdown" style="display: none; position: absolute; top: 100%; right: 0; background: #fff; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); min-width: 180px; z-index: 1000; margin-top: 5px; overflow: hidden; border: 1px solid #e8e8e8;">
-                            {% if request.user.is_superuser %}
+                            {% if request.user.is_superuser or request.user.userprofile.is_admin %}
                             <a href="{% url 'user_management' %}" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; color: #666; text-decoration: none; transition: background 0.2s;">
                                 <i class="fas fa-cog"></i> 系统设置
                             </a>
@@ -418,7 +402,7 @@
         </main>
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'external/bootstrap.bundle.min.js' %}"></script>
     <script>
         function toggleUserMenu() {
             var dropdown = document.getElementById('userDropdown');
@@ -426,6 +410,18 @@
                 dropdown.style.display = 'block';
             } else {
                 dropdown.style.display = 'none';
+            }
+        }
+
+        function toggleSparepartsMenu() {
+            var menu = document.getElementById('sparepartsMenu');
+            var parent = menu.parentElement;
+            if (menu.style.display === 'none') {
+                menu.style.display = 'block';
+                parent.classList.add('open');
+            } else {
+                menu.style.display = 'none';
+                parent.classList.remove('open');
             }
         }
 

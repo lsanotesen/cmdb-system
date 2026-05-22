@@ -3,65 +3,775 @@
 {% block title %}资产关系管理{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <h1 class="m-0">资产关系管理</h1>
-                </div>
-                <div class="col-sm-6">
-                    <ol class="breadcrumb float-sm-right">
-                        <li class="breadcrumb-item"><a href="#">首页</a></li>
-                        <li class="breadcrumb-item active">资产关系</li>
-                    </ol>
-                </div>
-            </div>
+<div class="card">
+    <div class="card-header">
+        <h2>🔗 资产关系管理</h2>
+        <div class="btn-group">
+            <button type="button" class="btn btn-success" id="btnFromSpare">📦 从备件库安装</button>
+            <button type="button" class="btn btn-primary" id="btnDirectInstall">➕ 直接安装新组件</button>
+            <a href="{% url 'uninstalled_hardware_list' %}" class="btn btn-secondary">🗑️ 已拆卸硬件</a>
         </div>
     </div>
+    <div class="card-body">
 
-    <div class="content">
-        <div class="container-fluid">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">资产关系列表</h3>
-                </div>
-                <div class="card-body">
-                    <table class="table table-bordered table-hover">
-                        <thead>
-                            <tr>
-                                <th>主资产</th>
-                                <th>子资产</th>
-                                <th>槽位</th>
-                                <th>是否可拆卸</th>
-                                <th>状态</th>
-                                <th>创建时间</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for relation in relations %}
-                            <tr>
-                                <td>{{ relation.parent_asset.name }}</td>
-                                <td><a href="{% url 'component_history' relation.child_asset.id %}">{{ relation.child_asset.name }}</a></td>
-                                <td>{{ relation.slot|default:"-" }}</td>
-                                <td>{% if relation.is_removable %}是{% else %}否{% endif %}</td>
-                                <td>{% if relation.is_active %}<span class="badge bg-green">有效</span>{% else %}<span class="badge bg-red">已拆卸</span>{% endif %}</td>
-                                <td>{{ relation.created_at|date:"Y-m-d H:i" }}</td>
-                                <td>
-                                    <a href="{% url 'asset_relation_detail' relation.id %}" class="btn btn-xs btn-info">查看详情</a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="7" class="text-center">暂无资产关系记录</td>
-                            </tr>
+<!-- 搜索框 -->
+<form method="GET" action="" style="display: flex; gap: 12px; margin-bottom: 16px;">
+    <input type="text" class="form-control" name="search" placeholder="搜索资产编号、IP、组件名称..." value="{{ search_query }}" style="width: 300px;">
+    <button type="submit" class="btn btn-secondary">搜索</button>
+    {% if search_query %}
+    <a href="{% url 'asset_relation_list' %}" class="btn btn-outline-secondary">重置</a>
+    {% endif %}
+</form>
+
+<div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>主资产编号</th>
+                    <th>子资产编号</th>
+                    <th>子资产名称</th>
+                    <th>型号</th>
+                    <th>SN</th>
+                    <th>槽位</th>
+                    <th>安装时间</th>
+                    <th>状态</th>
+                    <th>来源</th>
+                    <th>图片</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for relation in relations %}
+                <tr>
+                    <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname }}</td>
+                    <td>{{ relation.child_asset.device_model|default:"-" }}</td>
+                    <td>{{ relation.child_asset.sn|default:"-" }}</td>
+                    <td>{{ relation.slot|default:"-" }}</td>
+                    <td>{{ relation.created_at|date:"Y-m-d H:i:s" }}</td>
+                    <td>
+                        {% if relation.is_active %}
+                        <span class="badge bg-success">已安装</span>
+                        {% else %}
+                        <span class="badge bg-secondary">已拆卸</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for history in relation.install_histories.all %}
+                            {% if forloop.first %}
+                                {% if history.source_type == 'spare' %}
+                                <span class="badge bg-info">备件库</span>
+                                {% else %}
+                                <span class="badge bg-primary">直接采购</span>
+                                {% endif %}
+                            {% endif %}
+                        {% empty %}
+                        <span class="badge bg-secondary">-</span>
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% if relation.child_asset.images %}
+                            {% for img in relation.child_asset.get_images_list %}
+                                <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-edit" onclick="editRelation({{ relation.id }})">编辑</button>
+                        <button class="btn btn-sm btn-delete" onclick="uninstallComponent({{ relation.id }})">拆卸</button>
+                        <button class="btn btn-sm btn-history" onclick="showHistory({{ relation.id }})">历史</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center">暂无资产关系记录</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+<!-- 从备件库安装模态框 -->
+<div class="modal fade" id="fromSpareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">从备件库安装</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="fromSpareForm">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>选择备件 *</label>
+                        <select class="form-control" name="sparepart_id" id="sparepart_select" required>
+                            <option value="">请选择备件</option>
+                            {% for spare in spareparts %}
+                            <option value="{{ spare.id }}" 
+                                    data-model="{{ spare.model|default:'' }}" 
+                                    data-sn="{{ spare.serial_number|default:'' }}"
+                                    data-size="{{ spare.size|default:'' }}"
+                                    data-brand="{{ spare.brand|default:'' }}">
+                                {{ spare.name }} - {{ spare.model|default:'' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>型号</label>
+                            <input type="text" class="form-control" name="device_model" id="spare_device_model" placeholder="自动填充">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>序列号(SN)</label>
+                            <input type="text" class="form-control" name="sn" id="spare_sn" placeholder="自动填充">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>大小/规格</label>
+                            <input type="text" class="form-control" name="size" id="spare_size" placeholder="自动填充">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>品牌</label>
+                            <input type="text" class="form-control" name="brand" id="spare_brand" placeholder="自动填充">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>目标服务器（静态资产） *</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control searchable-select-input" 
+                                   placeholder="输入资产编号或IP搜索..." 
+                                   data-target="parent_host_id">
+                            <input type="hidden" name="parent_host_id" id="parent_host_id" required>
+                            <div class="searchable-select-dropdown" style="display: none;">
+                                <div class="searchable-select-list">
+                                    {% for asset in static_assets %}
+                                    <div class="searchable-select-item" 
+                                         data-value="{{ asset.id }}" 
+                                         data-text="{{ asset.asset_no|default:'无资产编号' }} - {{ asset.ip|default:'无IP' }}">
+                                        {{ asset.asset_no|default:'无资产编号' }} - {{ asset.ip|default:'无IP' }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>槽位 *</label>
+                        <input type="text" class="form-control" name="slot" placeholder="如：PCIe Slot 1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-success" onclick="submitFromSpareForm()">安装</button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- 直接安装新组件模态框 -->
+<div class="modal fade" id="directInstallModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">直接安装新组件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="directInstallForm">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>目标服务器（静态资产）</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control searchable-select-input" 
+                                   placeholder="输入资产编号或IP搜索..." 
+                                   data-target="direct_parent_host_id">
+                            <input type="hidden" name="parent_host_id" id="direct_parent_host_id" required>
+                            <div class="searchable-select-dropdown" style="display: none;">
+                                <div class="searchable-select-list">
+                                    {% for asset in static_assets %}
+                                    <div class="searchable-select-item" 
+                                         data-value="{{ asset.id }}" 
+                                         data-text="{{ asset.asset_no|default:'无资产编号' }} - {{ asset.ip|default:'无IP' }}">
+                                        {{ asset.asset_no|default:'无资产编号' }} - {{ asset.ip|default:'无IP' }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>显示名称</label>
+                        <input type="text" class="form-control" name="component_display_name" placeholder="如：硬盘（可以重复，用于显示）">
+                    </div>
+                    <div class="form-group">
+                        <label>组件名称</label>
+                        <input type="text" class="form-control" name="component_name" placeholder="如：NVIDIA Tesla V100" required>
+                    </div>
+                    <div class="form-group">
+                        <label>子资产编号</label>
+                        <input type="text" class="form-control" name="component_asset_no" placeholder="如：GPU-001">
+                    </div>
+                    <div class="form-group">
+                        <label>组件型号</label>
+                        <input type="text" class="form-control" name="component_model" placeholder="如：GV100-32GB">
+                    </div>
+                    <div class="form-group">
+                        <label>序列号(SN)</label>
+                        <input type="text" class="form-control" name="component_sn" placeholder="如：SN123456789">
+                    </div>
+                    <div class="form-group">
+                        <label>槽位</label>
+                        <input type="text" class="form-control" name="slot" placeholder="如：PCIe Slot 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>采购单号</label>
+                        <input type="text" class="form-control" name="purchase_order_no" placeholder="如：PO-2024-001">
+                    </div>
+                    <div class="form-group">
+                        <label>是否可拆卸</label>
+                        <select class="form-control" name="is_removable">
+                            <option value="true">是</option>
+                            <option value="false">否</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>安装时间</label>
+                        <input type="datetime-local" class="form-control" name="install_time" required>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea class="form-control" name="remark" rows="2" placeholder="可选"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitDirectInstallForm()">安装</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑资产关系模态框 -->
+<div class="modal fade" id="editRelationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑资产关系</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editRelationForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="relation_id" id="edit_relation_id">
+                    <div class="form-group">
+                        <label>子资产编号</label>
+                        <input type="text" class="form-control" name="asset_no" id="edit_asset_no" placeholder="如：GPU-001">
+                    </div>
+                    <div class="form-group">
+                        <label>显示名称</label>
+                        <input type="text" class="form-control" name="name" id="edit_name" placeholder="如：硬盘（可以重复）">
+                    </div>
+                    <div class="form-group">
+                        <label>品牌</label>
+                        <input type="text" class="form-control" name="brand" id="edit_brand" placeholder="如：Dell">
+                    </div>
+                    <div class="form-group">
+                        <label>型号</label>
+                        <input type="text" class="form-control" name="device_model" id="edit_device_model" placeholder="如：GV100-32GB">
+                    </div>
+                    <div class="form-group">
+                        <label>序列号(SN)</label>
+                        <input type="text" class="form-control" name="sn" id="edit_sn" placeholder="如：SN123456789">
+                    </div>
+                    <div class="form-group">
+                        <label>槽位</label>
+                        <input type="text" class="form-control" name="slot" id="edit_slot" placeholder="如：PCIe Slot 1">
+                    </div>
+                    <div class="form-group">
+                        <label>当前图片</label>
+                        <div id="edit_images_preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>上传新图片</label>
+                        <input type="file" name="images" accept="image/*" multiple class="form-control" onchange="previewImages(this, 'edit_new_images_preview')">
+                        <div id="edit_new_images_preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;"></div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" onclick="submitEditForm()">保存修改</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片预览模态框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">图片预览</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="display: flex; justify-content: center; align-items: center; min-height: 400px;">
+                <img id="previewImage" src="" style="max-width: 100%; max-height: 500px; object-fit: contain;" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 历史记录模态框 -->
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">资产历史记录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.searchable-select-wrapper {
+    position: relative;
+}
+.searchable-select-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 0.25rem 0.25rem;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.searchable-select-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+.searchable-select-item:hover {
+    background-color: #e9ecef;
+}
+.searchable-select-item:last-child {
+    border-bottom: none;
+}
+</style>
+
+<script>
+// 打开图片预览弹窗
+function openImagePreview(src) {
+    document.getElementById('previewImage').src = src;
+    new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+}
+
+// 存储要上传的图片文件
+var uploadedFiles = {};
+
+// 图片预览函数
+function previewImages(input, previewId) {
+    var preview = document.getElementById(previewId);
+    var files = input.files;
+    
+    if (!uploadedFiles[previewId]) {
+        uploadedFiles[previewId] = [];
+    }
+    
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        if (file.type.startsWith('image/')) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var imgWrapper = document.createElement('div');
+                imgWrapper.style.position = 'relative';
+                imgWrapper.style.width = '80px';
+                imgWrapper.style.height = '80px';
+                imgWrapper.dataset.index = uploadedFiles[previewId].length;
+                
+                var img = document.createElement('img');
+                img.src = e.target.result;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '4px';
+                img.style.border = '1px solid #ddd';
+                
+                var deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '×';
+                deleteBtn.style.position = 'absolute';
+                deleteBtn.style.top = '-8px';
+                deleteBtn.style.right = '-8px';
+                deleteBtn.style.width = '20px';
+                deleteBtn.style.height = '20px';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.borderRadius = '50%';
+                deleteBtn.style.backgroundColor = '#dc3545';
+                deleteBtn.style.color = 'white';
+                deleteBtn.style.fontSize = '14px';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.display = 'flex';
+                deleteBtn.style.alignItems = 'center';
+                deleteBtn.style.justifyContent = 'center';
+                deleteBtn.title = '删除此图片';
+                deleteBtn.onclick = function() {
+                    var index = parseInt(imgWrapper.dataset.index);
+                    uploadedFiles[previewId].splice(index, 1);
+                    // 更新剩余图片的索引
+                    var wrappers = preview.querySelectorAll('[data-index]');
+                    wrappers.forEach(function(wrapper, i) {
+                        wrapper.dataset.index = i;
+                    });
+                    imgWrapper.remove();
+                };
+                
+                imgWrapper.appendChild(img);
+                imgWrapper.appendChild(deleteBtn);
+                preview.appendChild(imgWrapper);
+            };
+            reader.readAsDataURL(file);
+            uploadedFiles[previewId].push(file);
+        }
+    }
+    
+    // 清空input以便重新选择
+    input.value = '';
+}
+
+// 简单的模态框控制
+document.getElementById('btnFromSpare').addEventListener('click', function() {
+    new bootstrap.Modal(document.getElementById('fromSpareModal')).show();
+});
+
+document.getElementById('btnDirectInstall').addEventListener('click', function() {
+    new bootstrap.Modal(document.getElementById('directInstallModal')).show();
+    // 设置默认安装时间为当前时间
+    var now = new Date();
+    var datetime = now.toISOString().slice(0, 16);
+    document.querySelector('#directInstallForm input[name="install_time"]').value = datetime;
+});
+
+// 初始化可搜索下拉框
+document.addEventListener('DOMContentLoaded', function() {
+    initSearchableSelects();
+});
+
+function initSearchableSelects() {
+    var inputs = document.querySelectorAll('.searchable-select-input');
+    inputs.forEach(function(input) {
+        var wrapper = input.parentElement;
+        var dropdown = wrapper.querySelector('.searchable-select-dropdown');
+        var list = dropdown.querySelector('.searchable-select-list');
+        var targetId = input.getAttribute('data-target');
+        var hiddenInput = document.getElementById(targetId);
+        
+        // 保存原始选项
+        var originalItems = Array.from(list.children);
+        
+        // 点击输入框显示下拉
+        input.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.style.display = 'block';
+            // 重置列表
+            list.innerHTML = '';
+            originalItems.forEach(function(item) {
+                list.appendChild(item.cloneNode(true));
+            });
+        });
+        
+        // 输入时过滤
+        input.addEventListener('input', function() {
+            var searchText = this.value.toLowerCase();
+            dropdown.style.display = 'block';
+            
+            // 过滤列表
+            list.innerHTML = '';
+            originalItems.forEach(function(item) {
+                var text = item.textContent.toLowerCase();
+                if (text.includes(searchText)) {
+                    list.appendChild(item.cloneNode(true));
+                }
+            });
+            
+            // 如果没有匹配项
+            if (list.children.length === 0) {
+                var noMatch = document.createElement('div');
+                noMatch.className = 'searchable-select-item';
+                noMatch.textContent = '未找到匹配的资产';
+                noMatch.style.color = '#999';
+                noMatch.style.cursor = 'default';
+                list.appendChild(noMatch);
+            }
+        });
+        
+        // 点击选项
+        list.addEventListener('click', function(e) {
+            var item = e.target;
+            if (item.classList.contains('searchable-select-item')) {
+                var value = item.getAttribute('data-value');
+                var text = item.getAttribute('data-text');
+                
+                input.value = text;
+                hiddenInput.value = value;
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        // 点击外部关闭
+        document.addEventListener('click', function() {
+            dropdown.style.display = 'none';
+        });
+    });
+}
+
+// 备件选择时自动填充字段
+document.addEventListener('DOMContentLoaded', function() {
+    var spareSelect = document.getElementById('sparepart_select');
+    if (spareSelect) {
+        spareSelect.addEventListener('change', function() {
+            var selectedOption = this.options[this.selectedIndex];
+            document.getElementById('spare_device_model').value = selectedOption.dataset.model || '';
+            document.getElementById('spare_sn').value = selectedOption.dataset.sn || '';
+            document.getElementById('spare_size').value = selectedOption.dataset.size || '';
+            document.getElementById('spare_brand').value = selectedOption.dataset.brand || '';
+        });
+    }
+});
+
+function submitFromSpareForm() {
+    var form = document.getElementById('fromSpareForm');
+    var sparepartId = form.querySelector('[name="sparepart_id"]').value;
+    var parentHostId = form.querySelector('[name="parent_host_id"]').value;
+    var slot = form.querySelector('[name="slot"]').value;
+    
+    if (!sparepartId) {
+        alert('请选择备件');
+        return;
+    }
+    if (!parentHostId) {
+        alert('请选择目标服务器');
+        return;
+    }
+    if (!slot) {
+        alert('请输入槽位');
+        return;
+    }
+    
+    $.ajax({
+        url: "{% url 'api_install_sparepart' %}",
+        type: "POST",
+        data: $('#fromSpareForm').serialize(),
+        success: function(response) {
+            if (response.success) {
+                alert('安装成功');
+                location.reload();
+            } else {
+                alert('安装失败: ' + response.error);
+            }
+        }
+    });
+}
+
+function submitDirectInstallForm() {
+    var form = document.getElementById('directInstallForm');
+    var parentHostId = form.querySelector('[name="parent_host_id"]').value;
+    var componentName = form.querySelector('[name="component_name"]').value;
+    var slot = form.querySelector('[name="slot"]').value;
+    
+    if (!parentHostId) {
+        alert('请选择目标服务器');
+        return;
+    }
+    if (!componentName) {
+        alert('请输入组件名称');
+        return;
+    }
+    if (!slot) {
+        alert('请输入槽位');
+        return;
+    }
+    
+    $.ajax({
+        url: "{% url 'api_direct_install_component' %}",
+        type: "POST",
+        data: $('#directInstallForm').serialize(),
+        success: function(response) {
+            if (response.success) {
+                alert('安装成功');
+                location.reload();
+            } else {
+                alert('安装失败: ' + response.error);
+            }
+        }
+    });
+}
+
+function editRelation(relationId) {
+    $.ajax({
+        url: "{% url 'api_get_relation_detail' %}",
+        type: "GET",
+        data: { 'relation_id': relationId },
+        success: function(response) {
+            if (response.success) {
+                var data = response.data;
+                document.getElementById('edit_relation_id').value = data.id;
+                document.getElementById('edit_asset_no').value = data.child_asset.asset_no || '';
+                document.getElementById('edit_name').value = data.child_asset.name || '';
+                document.getElementById('edit_brand').value = data.child_asset.brand || '';
+                document.getElementById('edit_device_model').value = data.child_asset.device_model || '';
+                document.getElementById('edit_sn').value = data.child_asset.sn || '';
+                document.getElementById('edit_slot').value = data.slot || '';
+                
+                // 加载图片预览
+                var imagesPreview = document.getElementById('edit_images_preview');
+                imagesPreview.innerHTML = '';
+                if (data.child_asset.images && data.child_asset.images.length > 0) {
+                    data.child_asset.images.forEach(function(img, index) {
+                        var imgWrapper = document.createElement('div');
+                        imgWrapper.style.position = 'relative';
+                        imgWrapper.style.width = '80px';
+                        imgWrapper.style.height = '80px';
+                        imgWrapper.dataset.index = index;
+                        imgWrapper.dataset.src = img;
+                        
+                        var imgElement = document.createElement('img');
+                        imgElement.src = img;
+                        imgElement.style.width = '100%';
+                        imgElement.style.height = '100%';
+                        imgElement.style.objectFit = 'cover';
+                        imgElement.style.borderRadius = '4px';
+                        imgElement.style.border = '1px solid #ddd';
+                        imgElement.style.cursor = 'pointer';
+                        imgElement.title = '点击查看大图';
+                        imgElement.onclick = function() { openImagePreview(img); };
+                        
+                        var deleteBtn = document.createElement('button');
+                        deleteBtn.innerHTML = '×';
+                        deleteBtn.style.position = 'absolute';
+                        deleteBtn.style.top = '-8px';
+                        deleteBtn.style.right = '-8px';
+                        deleteBtn.style.width = '20px';
+                        deleteBtn.style.height = '20px';
+                        deleteBtn.style.border = 'none';
+                        deleteBtn.style.borderRadius = '50%';
+                        deleteBtn.style.backgroundColor = '#dc3545';
+                        deleteBtn.style.color = 'white';
+                        deleteBtn.style.fontSize = '14px';
+                        deleteBtn.style.cursor = 'pointer';
+                        deleteBtn.style.display = 'flex';
+                        deleteBtn.style.alignItems = 'center';
+                        deleteBtn.style.justifyContent = 'center';
+                        deleteBtn.title = '删除此图片';
+                        deleteBtn.onclick = function() {
+                            imgWrapper.remove();
+                        };
+                        
+                        imgWrapper.appendChild(imgElement);
+                        imgWrapper.appendChild(deleteBtn);
+                        imagesPreview.appendChild(imgWrapper);
+                    });
+                } else {
+                    imagesPreview.innerHTML = '<span style="color: #999;">暂无图片</span>';
+                }
+                
+                new bootstrap.Modal(document.getElementById('editRelationModal')).show();
+            } else {
+                alert('获取数据失败: ' + response.error);
+            }
+        }
+    });
+}
+
+function submitEditForm() {
+    var formData = new FormData(document.getElementById('editRelationForm'));
+    
+    // 收集剩余的现有图片路径
+    var remainingImages = [];
+    var imageWrappers = document.querySelectorAll('#edit_images_preview [data-src]');
+    imageWrappers.forEach(function(wrapper) {
+        remainingImages.push(wrapper.dataset.src);
+    });
+    // 将剩余图片路径发送到后端
+    formData.append('remaining_images', JSON.stringify(remainingImages));
+    
+    // 添加要上传的图片文件
+    if (uploadedFiles['edit_new_images_preview']) {
+        uploadedFiles['edit_new_images_preview'].forEach(function(file, index) {
+            formData.append('images', file);
+        });
+    }
+    
+    $.ajax({
+        url: "{% url 'api_edit_relation' %}",
+        type: "POST",
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                // 清空上传文件缓存
+                uploadedFiles['edit_new_images_preview'] = [];
+                alert('修改成功');
+                location.reload();
+            } else {
+                alert('修改失败: ' + response.error);
+            }
+        }
+    });
+}
+
+function uninstallComponent(relationId) {
+    if (confirm('确定要拆卸此组件吗？')) {
+        $.post('/cmdb/api/remove_relation/', {
+            relation_id: relationId,
+            action: 'uninstall',
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert('拆卸成功');
+                location.reload();
+            } else {
+                alert('拆卸失败: ' + data.error);
+            }
+        });
+    }
+}
+
+function showHistory(relationId) {
+    $.get('/cmdb/api/get_relation_history/', {relation_id: relationId}, function(data) {
+        if (data.success) {
+            var html = '<h5>资产历史记录</h5><table class="table table-sm"><thead><tr><th>事件类型</th><th>时间</th><th>操作人</th><th>备注</th></tr></thead><tbody>';
+            if (data.data.length === 0) {
+                html += '<tr><td colspan="4" class="text-center">暂无历史记录</td></tr>';
+            } else {
+                $.each(data.data, function(i, item) {
+                    html += '<tr><td>' + item.event_type + '</td><td>' + item.event_time + '</td><td>' + item.operator + '</td><td>' + item.remark + '</td></tr>';
+                });
+            }
+            html += '</tbody></table>';
+            $('#historyModal .modal-body').html(html);
+            $('#historyModal').modal('show');
+        } else {
+            alert('获取历史失败: ' + data.error);
+        }
+    });
+}
+</script>
 {% endblock %}

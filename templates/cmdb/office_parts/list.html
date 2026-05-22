@@ -1,0 +1,665 @@
+{% extends 'base.html' %}
+
+{% block title %}办公机配件{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>💻 办公机配件</h2>
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="openAddModal()">➕ 添加配件</button>
+            <button class="btn btn-danger" onclick="batchDelete()" id="batchDeleteBtn" style="display: none;">🗑️ 批量删除</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- 搜索和筛选 -->
+        <div class="search-box" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
+            <div style="flex: 1; min-width: 200px; max-width: 250px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px; color: #666; white-space: nowrap;">关键词:</span>
+                    <input type="text" id="keywordInput" class="form-control" style="flex: 1; font-size: 13px; padding: 4px 8px;" value="{{ search_keyword }}" placeholder="搜索...">
+                </div>
+            </div>
+            <div style="width: 140px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px; color: #666; white-space: nowrap;">分类:</span>
+                    <select id="categorySelect" class="form-control" style="font-size: 13px; padding: 4px 8px;">
+                        <option value="">全部</option>
+                        {% for value, label in categories %}
+                        <option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div style="width: 140px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px; color: #666; white-space: nowrap;">状态:</span>
+                    <select id="statusSelect" class="form-control" style="font-size: 13px; padding: 4px 8px;">
+                        <option value="">全部</option>
+                        {% for value, label in statuses %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div style="flex: 0 0 auto; display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="applyFilters()">筛选</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">重置</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                </th>
+                <th>名称</th>
+                <th>分类</th>
+                <th>品牌</th>
+                <th>型号</th>
+                <th>SN</th>
+                <th>来源办公电脑</th>
+                <th>拆机时间</th>
+                <th>当前状态</th>
+                <th>更新时间</th>
+                <th>图片</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for part in parts %}
+                <tr>
+                    <td><input type="checkbox" class="part-checkbox" value="{{ part.id }}"></td>
+                    <td>{{ part.name }}</td>
+                    <td>
+                        {% if part.category == 'cpu' %}<span class="badge bg-primary">CPU</span>{% endif %}
+                        {% if part.category == 'motherboard' %}<span class="badge bg-info">主板</span>{% endif %}
+                        {% if part.category == 'gpu' %}<span class="badge bg-warning">显卡</span>{% endif %}
+                        {% if part.category == 'memory' %}<span class="badge bg-success">内存</span>{% endif %}
+                        {% if part.category == 'hdd' %}<span class="badge bg-secondary">机械硬盘</span>{% endif %}
+                        {% if part.category == 'ssd' %}<span class="badge bg-success">固态硬盘</span>{% endif %}
+                        {% if part.category == 'power' %}<span class="badge bg-danger">电源</span>{% endif %}
+                        {% if part.category == 'chassis' %}<span class="badge bg-dark">机箱</span>{% endif %}
+                        {% if part.category == 'monitor' %}<span class="badge bg-info">显示器</span>{% endif %}
+                        {% if part.category == 'keyboard' %}<span class="badge bg-secondary">键盘</span>{% endif %}
+                        {% if part.category == 'mouse' %}<span class="badge bg-secondary">鼠标</span>{% endif %}
+                        {% if part.category == 'webcam' %}<span class="badge bg-warning">摄像头</span>{% endif %}
+                        {% if part.category == 'headset' %}<span class="badge bg-primary">耳机/麦克风</span>{% endif %}
+                        {% if part.category == 'network_card' %}<span class="badge bg-warning">网卡</span>{% endif %}
+                        {% if part.category == 'other' %}<span class="badge bg-default">其他</span>{% endif %}
+                    </td>
+                    <td>{{ part.brand|default:"-" }}</td>
+                    <td>{{ part.model|default:"-" }}</td>
+                    <td>{{ part.serial_number|default:"-" }}</td>
+                    <td>{{ part.source_computer|default:"-" }}</td>
+                    <td>{{ part.dismantle_date|date:"Y-m-d"|default:"-" }}</td>
+                    <td>
+                        {% if part.status == 'new' %}<span class="badge bg-success">全新</span>{% endif %}
+                        {% if part.status == 'used' %}<span class="badge bg-info">拆机良品</span>{% endif %}
+                        {% if part.status == 'in_stock' %}<span class="badge bg-secondary">闲置库存</span>{% endif %}
+                        {% if part.status == 'installed' %}<span class="badge bg-success">使用中</span>{% endif %}
+                        {% if part.status == 'pending' %}<span class="badge bg-warning">待检测</span>{% endif %}
+                        {% if part.status == 'faulty' %}<span class="badge bg-danger">故障</span>{% endif %}
+                        {% if part.status == 'retired' %}<span class="badge bg-secondary">待报废</span>{% endif %}
+                    </td>
+                    <td>{{ part.updated_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if part.images %}
+                            {% for img in part.get_images_list %}
+                                <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
+                            {% endfor %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-edit" onclick="openEditModal({{ part.id }})">编辑</button>
+                        <button class="btn btn-sm btn-delete" onclick="deletePart({{ part.id }})">删除</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="text-center">暂无办公机配件记录</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- 添加配件弹窗 -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加办公机配件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>配件名称 *</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>配件分类 *</label>
+                            <select name="category" class="form-control" required>
+                                {% for value, label in categories %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>品牌</label>
+                            <input type="text" name="brand" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>型号</label>
+                            <input type="text" name="model" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>SN</label>
+                            <input type="text" name="serial_number" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>来源办公电脑</label>
+                            <input type="text" name="source_computer" class="form-control" placeholder="如: PC-2024-001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>当前状态 *</label>
+                            <select name="status" class="form-control" required>
+                                {% for value, label in statuses %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>拆机时间</label>
+                            <input type="date" name="dismantle_date" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>存放位置</label>
+                            <input type="text" name="location" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>购买日期</label>
+                            <input type="date" name="purchase_date" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>上传图片</label>
+                        <input type="file" name="images" accept="image/*" multiple class="form-control" onchange="previewImages(this, 'add_images_preview')">
+                        <div id="add_images_preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea name="remark" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddForm()">确认添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑配件弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑办公机配件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="part_id" id="edit_part_id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>配件名称 *</label>
+                            <input type="text" name="name" id="edit_name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>配件分类 *</label>
+                            <select name="category" id="edit_category" class="form-control" required>
+                                {% for value, label in categories %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>品牌</label>
+                            <input type="text" name="brand" id="edit_brand" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>型号</label>
+                            <input type="text" name="model" id="edit_model" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>SN</label>
+                            <input type="text" name="serial_number" id="edit_serial_number" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>来源办公电脑</label>
+                            <input type="text" name="source_computer" id="edit_source_computer" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>当前状态 *</label>
+                            <select name="status" id="edit_status" class="form-control" required>
+                                {% for value, label in statuses %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>拆机时间</label>
+                            <input type="date" name="dismantle_date" id="edit_dismantle_date" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>存放位置</label>
+                            <input type="text" name="location" id="edit_location" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>购买日期</label>
+                            <input type="date" name="purchase_date" id="edit_purchase_date" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>当前图片</label>
+                        <div id="edit_images_preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>上传新图片</label>
+                        <input type="file" name="images" accept="image/*" multiple class="form-control" onchange="previewImages(this, 'edit_new_images_preview')">
+                        <div id="edit_new_images_preview" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea name="remark" id="edit_remark" class="form-control" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditForm()">确认保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 图片预览函数
+function openImagePreview(src) {
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; justify-content: center; align-items: center;';
+    modal.onclick = function() { document.body.removeChild(modal); };
+    
+    var img = document.createElement('img');
+    img.src = src;
+    img.style.cssText = 'max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 8px;';
+    img.onclick = function(e) { e.stopPropagation(); };
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+}
+
+// 打开添加弹窗
+function openAddModal() {
+    document.getElementById('addForm').reset();
+    new bootstrap.Modal(document.getElementById('addModal')).show();
+}
+
+// 提交添加表单
+function submitAddForm() {
+    var formData = new FormData(document.getElementById('addForm'));
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    
+    // 添加要上传的图片文件
+    if (uploadedFiles['add_images_preview']) {
+        uploadedFiles['add_images_preview'].forEach(function(file, index) {
+            formData.append('images', file);
+        });
+    }
+
+    fetch('{% url "office_part_add" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 清空上传文件缓存
+            uploadedFiles['add_images_preview'] = [];
+            location.reload();
+        } else {
+            alert(data.error || '添加失败');
+        }
+    });
+}
+
+// 打开编辑弹窗
+function openEditModal(partId) {
+    fetch('{% url "office_part_edit" part_id=0 %}'.replace('0', partId))
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            var part = data.data;
+            document.getElementById('edit_part_id').value = part.id;
+            document.getElementById('edit_name').value = part.name;
+            document.getElementById('edit_category').value = part.category;
+            document.getElementById('edit_brand').value = part.brand;
+            document.getElementById('edit_model').value = part.model;
+            document.getElementById('edit_serial_number').value = part.serial_number;
+            document.getElementById('edit_source_computer').value = part.source_computer;
+            document.getElementById('edit_status').value = part.status;
+            document.getElementById('edit_dismantle_date').value = part.dismantle_date;
+            document.getElementById('edit_location').value = part.location;
+            document.getElementById('edit_purchase_date').value = part.purchase_date;
+            document.getElementById('edit_remark').value = part.remark;
+            
+            // 加载图片预览
+            var imagesPreview = document.getElementById('edit_images_preview');
+            imagesPreview.innerHTML = '';
+            if (part.images && part.images.length > 0) {
+                part.images.forEach(function(img, index) {
+                    var imgWrapper = document.createElement('div');
+                    imgWrapper.style.position = 'relative';
+                    imgWrapper.style.width = '80px';
+                    imgWrapper.style.height = '80px';
+                    imgWrapper.dataset.index = index;
+                    imgWrapper.dataset.src = img;
+                    
+                    var imgElement = document.createElement('img');
+                    imgElement.src = img;
+                    imgElement.style.width = '100%';
+                    imgElement.style.height = '100%';
+                    imgElement.style.objectFit = 'cover';
+                    imgElement.style.borderRadius = '4px';
+                    imgElement.style.border = '1px solid #ddd';
+                    imgElement.style.cursor = 'pointer';
+                    imgElement.title = '点击查看大图';
+                    imgElement.onclick = function() { openImagePreview(img); };
+                    
+                    var deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.style.position = 'absolute';
+                    deleteBtn.style.top = '-8px';
+                    deleteBtn.style.right = '-8px';
+                    deleteBtn.style.width = '20px';
+                    deleteBtn.style.height = '20px';
+                    deleteBtn.style.border = 'none';
+                    deleteBtn.style.borderRadius = '50%';
+                    deleteBtn.style.backgroundColor = '#dc3545';
+                    deleteBtn.style.color = 'white';
+                    deleteBtn.style.fontSize = '14px';
+                    deleteBtn.style.cursor = 'pointer';
+                    deleteBtn.style.display = 'flex';
+                    deleteBtn.style.alignItems = 'center';
+                    deleteBtn.style.justifyContent = 'center';
+                    deleteBtn.title = '删除此图片';
+                    deleteBtn.onclick = function() {
+                        imgWrapper.remove();
+                    };
+                    
+                    imgWrapper.appendChild(imgElement);
+                    imgWrapper.appendChild(deleteBtn);
+                    imagesPreview.appendChild(imgWrapper);
+                });
+            } else {
+                imagesPreview.innerHTML = '<span style="color: #999;">暂无图片</span>';
+            }
+
+            new bootstrap.Modal(document.getElementById('editModal')).show();
+        } else {
+            alert(data.error || '获取配件信息失败');
+        }
+    });
+}
+
+// 提交编辑表单
+function submitEditForm() {
+    var formData = new FormData(document.getElementById('editForm'));
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    var partId = document.getElementById('edit_part_id').value;
+    
+    // 收集剩余的现有图片路径
+    var remainingImages = [];
+    var imageWrappers = document.querySelectorAll('#edit_images_preview [data-src]');
+    imageWrappers.forEach(function(wrapper) {
+        remainingImages.push(wrapper.dataset.src);
+    });
+    // 将剩余图片路径发送到后端
+    formData.append('remaining_images', JSON.stringify(remainingImages));
+    
+    // 添加要上传的图片文件
+    if (uploadedFiles['edit_new_images_preview']) {
+        uploadedFiles['edit_new_images_preview'].forEach(function(file, index) {
+            formData.append('images', file);
+        });
+    }
+
+    fetch('{% url "office_part_edit" part_id=0 %}'.replace('0', partId), {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 清空上传文件缓存
+            uploadedFiles['edit_new_images_preview'] = [];
+            location.reload();
+        } else {
+            alert(data.error || '保存失败');
+        }
+    });
+}
+
+// 删除配件
+function deletePart(partId) {
+    if (confirm('确定要删除这个配件吗？')) {
+        fetch('{% url "office_part_delete" part_id=0 %}'.replace('0', partId), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || '删除失败');
+            }
+        });
+    }
+}
+
+// 存储要上传的图片文件
+var uploadedFiles = {};
+
+// 图片预览函数
+function previewImages(input, previewId) {
+    var preview = document.getElementById(previewId);
+    var files = input.files;
+    
+    if (!uploadedFiles[previewId]) {
+        uploadedFiles[previewId] = [];
+    }
+    
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        if (file.type.startsWith('image/')) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var imgWrapper = document.createElement('div');
+                imgWrapper.style.position = 'relative';
+                imgWrapper.style.width = '80px';
+                imgWrapper.style.height = '80px';
+                imgWrapper.dataset.index = uploadedFiles[previewId].length;
+                
+                var img = document.createElement('img');
+                img.src = e.target.result;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '4px';
+                img.style.border = '1px solid #ddd';
+                
+                var deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '×';
+                deleteBtn.style.position = 'absolute';
+                deleteBtn.style.top = '-8px';
+                deleteBtn.style.right = '-8px';
+                deleteBtn.style.width = '20px';
+                deleteBtn.style.height = '20px';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.borderRadius = '50%';
+                deleteBtn.style.backgroundColor = '#dc3545';
+                deleteBtn.style.color = 'white';
+                deleteBtn.style.fontSize = '14px';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.display = 'flex';
+                deleteBtn.style.alignItems = 'center';
+                deleteBtn.style.justifyContent = 'center';
+                deleteBtn.title = '删除此图片';
+                deleteBtn.onclick = function() {
+                    var index = parseInt(imgWrapper.dataset.index);
+                    uploadedFiles[previewId].splice(index, 1);
+                    // 更新剩余图片的索引
+                    var wrappers = preview.querySelectorAll('[data-index]');
+                    wrappers.forEach(function(wrapper, i) {
+                        wrapper.dataset.index = i;
+                    });
+                    imgWrapper.remove();
+                };
+                
+                imgWrapper.appendChild(img);
+                imgWrapper.appendChild(deleteBtn);
+                preview.appendChild(imgWrapper);
+            };
+            reader.readAsDataURL(file);
+            uploadedFiles[previewId].push(file);
+        }
+    }
+    
+    // 清空input以便重新选择
+    input.value = '';
+}
+
+// 全选/取消全选
+function toggleSelectAll() {
+    var selectAll = document.getElementById('selectAll');
+    var checkboxes = document.querySelectorAll('.part-checkbox');
+    
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateBatchDeleteButton();
+}
+
+// 更新批量删除按钮状态
+function updateBatchDeleteButton() {
+    var checkedBoxes = document.querySelectorAll('.part-checkbox:checked');
+    var batchBtn = document.getElementById('batchDeleteBtn');
+    
+    if (checkedBoxes.length > 0) {
+        batchBtn.style.display = 'inline-block';
+    } else {
+        batchBtn.style.display = 'none';
+    }
+}
+
+// 监听单个复选框变化
+document.addEventListener('DOMContentLoaded', function() {
+    var checkboxes = document.querySelectorAll('.part-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateBatchDeleteButton);
+    });
+});
+
+// 批量删除
+function batchDelete() {
+    var checkedBoxes = document.querySelectorAll('.part-checkbox:checked');
+    var ids = Array.from(checkedBoxes).map(function(cb) { return cb.value; });
+    
+    if (ids.length === 0) {
+        alert('请选择要删除的配件');
+        return;
+    }
+    
+    if (confirm('确定要删除选中的 ' + ids.length + ' 个配件吗？')) {
+        var formData = new FormData();
+        formData.append('ids', JSON.stringify(ids));
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('{% url "office_part_batch_delete" %}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || '批量删除失败');
+            }
+        });
+    }
+}
+
+// 应用筛选
+function applyFilters() {
+    var keyword = document.getElementById('keywordInput').value;
+    var category = document.getElementById('categorySelect').value;
+    var status = document.getElementById('statusSelect').value;
+
+    var url = '{% url "office_parts_list" %}?';
+    var params = [];
+    if (keyword) params.push('keyword=' + encodeURIComponent(keyword));
+    if (category) params.push('category=' + category);
+    if (status) params.push('status=' + status);
+
+    window.location.href = url + params.join('&');
+}
+
+// 清除筛选
+function clearFilters() {
+    document.getElementById('keywordInput').value = '';
+    document.getElementById('categorySelect').value = '';
+    document.getElementById('statusSelect').value = '';
+    applyFilters();
+}
+
+// 回车键搜索
+document.getElementById('keywordInput').addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+    }
+});
+</script>
+{% endblock %}

@@ -1,14 +1,40 @@
 <div class="modal-header">
-    <h5 class="modal-title">添加备件</h5>
+    <h5 class="modal-title text-center w-100">添加备件</h5>
     <button type="button" class="close" data-dismiss="modal">&times;</button>
 </div>
 <div class="modal-body">
-    <form id="addForm" enctype="multipart/form-data">
+    <form id="addForm" enctype="multipart/form-data" class="mx-auto" style="max-width: 600px;">
         <div class="form-row">
             <div class="form-group col-md-6">
                 <label>备件资产编号（可选）</label>
                 <input type="text" class="form-control" name="asset_code" placeholder="如 HD-2025-001">
             </div>
+            <div class="form-group col-md-6">
+                <label>备件名称 *</label>
+                <input type="text" class="form-control" name="name" placeholder="如：硬盘" required>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>品牌</label>
+                <input type="text" class="form-control" name="brand" placeholder="如：Dell">
+            </div>
+            <div class="form-group col-md-6">
+                <label>型号</label>
+                <input type="text" class="form-control" name="model" placeholder="如：XPS-15">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>大小/规格</label>
+                <input type="text" class="form-control" name="size" placeholder="如：1TB">
+            </div>
+            <div class="form-group col-md-6">
+                <label>序列号</label>
+                <input type="text" class="form-control" name="serial_number" placeholder="如：SN123456">
+            </div>
+        </div>
+        <div class="form-row">
             <div class="form-group col-md-6">
                 <label>备件类型 *</label>
                 <select class="form-control" name="type" required>
@@ -19,6 +45,20 @@
                     <option value="fan">风扇</option>
                     <option value="other">其他</option>
                 </select>
+            </div>
+            <div class="form-group col-md-6">
+                <label>存放位置</label>
+                <input type="text" class="form-control" name="location" placeholder="如：机房A-柜01">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group col-md-6">
+                <label>购买日期</label>
+                <input type="date" class="form-control" name="purchase_date">
+            </div>
+            <div class="form-group col-md-6">
+                <label>保修日期</label>
+                <input type="date" class="form-control" name="warranty_date">
             </div>
         </div>
         <div class="form-row">

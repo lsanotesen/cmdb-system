@@ -38,6 +38,7 @@ services:
       - DB_USER=cmdb
       - DB_PASSWORD=cmdb123
       - DB_NAME=cmdb
+      - DEBUG=True
     volumes:
       - .:/app
       - /data01/db_backup:/data01/db_backup

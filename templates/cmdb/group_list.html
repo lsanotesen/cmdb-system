@@ -1,15 +1,16 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <h2>资产组列表</h2>
-    </div>
-    <div class="panel-body">
-        <div style="margin-bottom: 20px;">
-            <a href="{% url 'group_add' %}" class="btn btn-success">+ 添加资产组</a>
+<div class="card">
+    <div class="card-header">
+        <h2>📊 动态资产组</h2>
+        <div class="btn-group">
+            <a href="{% url 'group_add' %}" class="btn btn-success">➕ 添加资产组</a>
         </div>
-        <table>
+    </div>
+    <div class="card-body">
+        <div class="table-container">
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>组名称</th>
@@ -24,9 +25,9 @@
                     <td>{{ group.name }}</td>
                     <td>{{ group.desc|default:'-' }}</td>
                     <td>{{ group.serverList.count }}</td>
-                    <td class="actions">
-                        <a href="{% url 'group_edit' group.id %}" class="btn">编辑</a>
-                        <a href="{% url 'group_delete' group.id %}" class="btn btn-danger" onclick="return confirm('确定删除?')">删除</a>
+                    <td>
+                        <button class="btn btn-sm btn-edit" data-url="{% url 'group_edit' group.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                        <button class="btn btn-sm btn-delete" data-url="{% url 'group_delete' group.id %}" onclick="confirmDelete(this.dataset.url)">删除</button>
                     </td>
                 </tr>
                 {% empty %}
@@ -36,6 +37,17 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(url) {
+    if (confirm('确定删除?')) {
+        location.href = url;
+    }
+}
+</script>
 {% endblock %}

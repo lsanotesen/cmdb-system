@@ -18,7 +18,8 @@
             {% endfor %}
         {% endif %}
 
-        <table class="table">
+        <div class="table-container">
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>名称</th>
@@ -54,17 +55,18 @@
                     </td>
                     <td>{{ bastion.memo|truncatechars:20 }}</td>
                     <td>
-                        <a href="{% url 'bastion_edit' bastion.id %}" class="btn btn-sm btn-warning">编辑</a>
-                        <a href="{% url 'bastion_delete' bastion.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除该跳板机？')">删除</a>
+                        <button class="btn btn-sm btn-edit" data-url="{% url 'bastion_edit' bastion.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                        <button class="btn btn-sm btn-delete" data-url="{% url 'bastion_delete' bastion.id %}" onclick="confirmDelete(this.dataset.url)">删除</button>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted">暂无跳板机配置</td>
+                    <td colspan="8" class="text-center">暂无跳板机配置</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}已退库设备管理{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📦 已退库设备管理</h2>
+        <p class="text-muted">查看所有已退库的硬件设备</p>
+    </div>
+    <div class="card-body">
+
+<!-- 搜索框 -->
+<form method="GET" action="" style="display: flex; gap: 12px; margin-bottom: 16px;">
+    <input type="text" class="form-control" name="search" placeholder="搜索资产编号、名称、型号..." value="{{ search_query }}" style="width: 300px;">
+    <button type="submit" class="btn btn-secondary">搜索</button>
+    {% if search_query %}
+    <a href="{% url 'returned_devices_list' %}" class="btn btn-outline-secondary">重置</a>
+    {% endif %}
+</form>
+
+<div class="card">
+    <div class="card-body">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>原主资产编号</th>
+                    <th>子资产编号</th>
+                    <th>子资产名称</th>
+                    <th>型号</th>
+                    <th>SN</th>
+                    <th>原槽位</th>
+                    <th>退库时间</th>
+                    <th>图片</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for relation in relations %}
+                <tr>
+                    <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname }}</td>
+                    <td>{{ relation.child_asset.device_model|default:"-" }}</td>
+                    <td>{{ relation.child_asset.sn|default:"-" }}</td>
+                    <td>{{ relation.slot|default:"-" }}</td>
+                    <td>{{ relation.returned_at|date:"Y-m-d H:i:s" }}</td>
+                    <td>
+                        {% if relation.child_asset.images %}
+                            {% for img in relation.child_asset.get_images_list %}
+                                <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
+                            {% endfor %}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-warning" onclick="cancelReturn({{ relation.id }})">取消退库</button>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteRecord({{ relation.id }})">删除</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center">暂无已退库的设备记录</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 添加到备件库模态框 -->
+<div class="modal fade" id="addToSpareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加到备件库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addToSpareForm">
+                    <input type="hidden" id="relation_id" name="relation_id">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">备件状态</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="in_stock">正常库存</option>
+                            <option value="defective">待维修</option>
+                            <option value="scrap">报废</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>提示：</strong>如果硬件正常可用，请选择"正常库存"；如果有故障需要维修，请选择"待维修"；如果已损坏无法修复，请选择"报废"。
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddToSpare()">确认添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addToSpareparts(relationId) {
+    document.getElementById('relation_id').value = relationId;
+    $('#addToSpareModal').modal('show');
+}
+
+function submitAddToSpare() {
+    var relationId = document.getElementById('relation_id').value;
+    var status = document.getElementById('status').value;
+    
+    $.post('/cmdb/api/add_to_spareparts/', {
+        relation_id: relationId,
+        status: status,
+        csrfmiddlewaretoken: '{{ csrf_token }}'
+    }, function(data) {
+        if (data.success) {
+            alert(data.message);
+            $('#addToSpareModal').modal('hide');
+            location.reload();
+        } else {
+            alert('添加失败: ' + data.error);
+        }
+    });
+}
+
+function cancelReturn(relationId) {
+    if (confirm('确定要取消退库吗？此操作将把设备恢复到已拆卸状态。')) {
+        $.post('/cmdb/api/cancel_return/', {
+            relation_id: relationId,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('取消退库失败: ' + data.error);
+            }
+        });
+    }
+}
+
+function deleteRecord(relationId) {
+    if (confirm('确定要删除这条记录吗？此操作不可恢复！')) {
+        $.post('/cmdb/api/delete_returned_record/', {
+            relation_id: relationId,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('删除失败: ' + data.error);
+            }
+        });
+    }
+}
+
+// 打开图片预览弹窗
+function openImagePreview(src) {
+    document.getElementById('previewImage').src = src;
+    new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+}
+</script>
+
+<!-- 图片预览模态框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">图片预览</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-flex justify-content-center align-items-center">
+                <img id="previewImage" src="" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

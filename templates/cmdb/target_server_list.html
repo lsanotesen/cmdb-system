@@ -29,8 +29,8 @@
                 <button type="submit" class="btn btn-danger" onclick="return confirm('确定删除选中的目标服务器？')">🗑️ 批量删除</button>
             </div>
 
-            <div class="table-responsive">
-                <table>
+            <div class="table-container">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th style="width: 50px;"></th>
@@ -65,16 +65,14 @@
                                 {% endif %}
                             </td>
                             <td>{{ config.created_at|date:"Y-m-d H:i" }}</td>
-                            <td class="actions">
-                                <a href="{% url 'target_server_edit' config.id %}" class="btn btn-sm btn-secondary">✏️ 编辑</a>
-                                <a href="{% url 'target_server_delete' config.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除该目标服务器？')">🗑️ 删除</a>
+                            <td>
+                                <button class="btn btn-sm btn-edit" data-url="{% url 'target_server_edit' config.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                                <button class="btn btn-sm btn-delete" data-url="{% url 'target_server_delete' config.id %}" onclick="confirmDelete(this.dataset.url)">删除</button>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="9" class="text-center" style="padding: 40px;">
-                                <p style="color: #718096; margin: 0;">暂无目标服务器</p>
-                            </td>
+                            <td colspan="9" class="text-center">暂无目标服务器</td>
                         </tr>
                         {% endfor %}
                     </tbody>

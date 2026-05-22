@@ -7,7 +7,8 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
-from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType, AssetRelation, InstallHistory, LifecycleEvent
+from django.db import transaction
+from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType, AssetRelation, InstallHistory, LifecycleEvent, OfficePart
 from django.utils import timezone
 from .scheduler import update_scheduler_job
 import paramiko
@@ -17,6 +18,7 @@ import os
 import time
 import threading
 import logging
+import uuid
 from datetime import datetime
 
 # 导入硬件采集模块
@@ -43,6 +45,35 @@ def superuser_required(view_func):
             return redirect('cmdb_index')
         return view_func(request, *args, **kwargs)
     return wrapped_view
+
+def admin_required(view_func):
+    """自定义装饰器：只允许管理员用户访问（包括 is_superuser 和 is_admin）"""
+    def wrapped_view(request, *args, **kwargs):
+        # 检查是否是超级管理员或管理员用户
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        # 检查用户是否有 is_admin 标记
+        try:
+            profile = request.user.userprofile
+            if profile.is_admin:
+                return view_func(request, *args, **kwargs)
+        except UserProfile.DoesNotExist:
+            pass
+        
+        messages.error(request, '您没有权限访问此页面')
+        return redirect('cmdb_index')
+    return wrapped_view
+
+def has_admin_access(user):
+    """检查用户是否有管理员权限"""
+    if user.is_superuser:
+        return True
+    try:
+        profile = user.userprofile
+        return profile.is_admin
+    except UserProfile.DoesNotExist:
+        return False
 
 # 解析IP范围或逗号分隔的IP列表
 def parse_ip_range(ip_range):
@@ -77,7 +108,12 @@ def parse_ip_range(ip_range):
 def index(request):
     try:
         # 计算统计数据
-        host_count = Host.objects.count()
+        # 排除组件资产（hostname以direct-或component-开头的）
+        from django.db.models import Q
+        host_count = Host.objects.exclude(
+            Q(hostname__startswith='direct-') | 
+            Q(hostname__startswith='component-')
+        ).count()
         static_asset_count = StaticAsset.objects.count()
         idc_count = Idc.objects.count()
         cabinet_count = Cabinet.objects.count()
@@ -188,8 +224,11 @@ def asset_list(request):
         group_filter = request.GET.get('group', '')
         cabinet_filter = request.GET.get('cabinet', '')
         
-        # 构建查询
-        queryset = Host.objects.all()
+        # 构建查询（排除组件资产，组件资产hostname以direct-或component-开头）
+        queryset = Host.objects.exclude(
+            Q(hostname__startswith='direct-') | 
+            Q(hostname__startswith='component-')
+        )
         
         # 关键词搜索
         if keyword:
@@ -257,6 +296,14 @@ def asset_list(request):
             ('4', '维护')
         ]
         
+        # 计算统计数据
+        total_count = Host.objects.exclude(
+            Q(hostname__startswith='direct-') | 
+            Q(hostname__startswith='component-')
+        ).count()
+        filtered_count = len(hosts)
+        has_filter = keyword or idc_id or asset_type or status or group_filter or cabinet_filter
+        
         return render(request, 'cmdb/asset_list.html', {
             'hosts': hosts,
             'keyword': keyword,
@@ -269,7 +316,10 @@ def asset_list(request):
             'host_groups': host_groups,
             'cabinet_list': cabinet_list,
             'asset_types': asset_types,
-            'asset_status': asset_status
+            'asset_status': asset_status,
+            'total_count': total_count,
+            'filtered_count': filtered_count,
+            'has_filter': has_filter
         })
     except Exception as e:
         messages.error(request, f'获取资产列表失败: {str(e)}')
@@ -288,8 +338,8 @@ def asset_add(request):
 @login_required
 def asset_detail(request, asset_id):
     try:
-        asset = get_object_or_404(Host, id=asset_id)
-        return render(request, 'cmdb/asset_detail.html', {'asset': asset})
+        host = get_object_or_404(Host, id=asset_id)
+        return render(request, 'cmdb/asset_detail.html', {'host': host})
     except Exception as e:
         messages.error(request, f'获取资产详情失败: {str(e)}')
         return redirect('asset_list')
@@ -374,8 +424,11 @@ def export_assets_excel(request):
         headers = ['主机名', '资产编号', '机柜位置', '部门/团队', '设备类型', 'IP地址', '责任人', '品牌型号', 'CPU型号', 'CPU数量', 'CPU核数', 'GPU', '内存', '硬盘', '操作系统', '序列号', '带外IP', '上架时间', '设备状态', '所属机房', '备注']
         ws.append(headers)
         
-        # 获取资产数据
-        hosts = Host.objects.all()
+        # 获取资产数据（排除组件资产）
+        hosts = Host.objects.exclude(
+            Q(hostname__startswith='direct-') | 
+            Q(hostname__startswith='component-')
+        )
         for host in hosts:
             row = [
                 host.hostname,
@@ -448,8 +501,11 @@ def export_assets_csv(request):
         headers = ['主机名', '资产编号', '机柜位置', '部门/团队', '设备类型', 'IP地址', '责任人', '品牌型号', 'CPU型号', 'CPU数量', 'CPU核数', 'GPU', '内存', '硬盘', '操作系统', '序列号', '带外IP', '上架时间', '设备状态', '所属机房', '备注']
         writer.writerow(headers)
         
-        # 获取资产数据
-        hosts = Host.objects.all()
+        # 获取资产数据（排除组件资产）
+        hosts = Host.objects.exclude(
+            Q(hostname__startswith='direct-') | 
+            Q(hostname__startswith='component-')
+        )
         for host in hosts:
             row = [
                 host.hostname,
@@ -539,8 +595,8 @@ def idc_add(request):
             name = request.POST.get('name')
             address = request.POST.get('address')
             phone = request.POST.get('phone')
-            contact = request.POST.get('contact')
-            desc = request.POST.get('desc')
+            contact = request.POST.get('contact', '') or ''
+            desc = request.POST.get('desc', '') or ''
             
             # 创建IDC
             idc = Idc(name=name, address=address, phone=phone, contact=contact, desc=desc)
@@ -567,8 +623,8 @@ def idc_edit(request, idc_id):
             name = request.POST.get('name')
             address = request.POST.get('address')
             phone = request.POST.get('phone')
-            contact = request.POST.get('contact')
-            desc = request.POST.get('desc')
+            contact = request.POST.get('contact', '') or ''
+            desc = request.POST.get('desc', '') or ''
             
             # 更新IDC信息
             idc.name = name
@@ -606,8 +662,18 @@ def idc_delete(request, idc_id):
 @login_required
 def cabinet_list(request):
     try:
+        idc_id = request.GET.get('idc_id', '')
         cabinets = Cabinet.objects.all()
-        return render(request, 'cmdb/cabinet_list.html', {'cabinets': cabinets})
+        
+        if idc_id:
+            cabinets = cabinets.filter(idc_id=idc_id)
+        
+        idc_list = Idc.objects.all()
+        return render(request, 'cmdb/cabinet_list.html', {
+            'cabinets': cabinets,
+            'idc_list': idc_list,
+            'selected_idc_id': idc_id
+        })
     except Exception as e:
         messages.error(request, f'获取机柜列表失败: {str(e)}')
         return render(request, 'cmdb/cabinet_list.html', {'cabinets': []})
@@ -711,8 +777,11 @@ def group_add(request):
             return redirect('group_list')
         else:
             # 渲染表单
-            # 获取所有主机作为可用服务器
-            available_hosts = Host.objects.all()
+            # 获取所有主机作为可用服务器（排除组件资产）
+            available_hosts = Host.objects.exclude(
+                Q(hostname__startswith='direct-') | 
+                Q(hostname__startswith='component-')
+            )
             # 按主机名排序
             available_hosts = sorted(available_hosts, key=lambda host: host.hostname)
             # 新组没有已选服务器
@@ -748,8 +817,11 @@ def group_edit(request, group_id):
             return redirect('group_list')
         else:
             # 渲染表单
-            # 获取所有主机
-            all_hosts = Host.objects.all()
+            # 获取所有主机（排除组件资产）
+            all_hosts = Host.objects.exclude(
+                Q(hostname__startswith='direct-') | 
+                Q(hostname__startswith='component-')
+            )
             # 按主机名排序
             all_hosts = sorted(all_hosts, key=lambda host: host.hostname)
             # 已选服务器
@@ -930,6 +1002,7 @@ def import_target_server_excel(request):
 
 # 跳板机相关视图
 @login_required
+@admin_required
 def bastion_list(request):
     try:
         bastions = BastionHost.objects.all()
@@ -941,6 +1014,21 @@ def bastion_list(request):
 @login_required
 def bastion_add(request):
     try:
+        if request.method == 'POST':
+            # 处理表单提交
+            bastion = BastionHost(
+                name=request.POST.get('name'),
+                host=request.POST.get('host'),
+                port=int(request.POST.get('port', 22)),
+                username=request.POST.get('username'),
+                password=request.POST.get('password'),
+                private_key=request.POST.get('private_key'),
+                is_enabled=request.POST.get('is_enabled') == 'on',
+                memo=request.POST.get('memo')
+            )
+            bastion.save()
+            messages.success(request, f'跳板机 {bastion.name} 添加成功')
+            return redirect('bastion_list')
         return render(request, 'cmdb/bastion_form.html', {'action': 'add'})
     except Exception as e:
         messages.error(request, f'添加跳板机失败: {str(e)}')
@@ -950,6 +1038,19 @@ def bastion_add(request):
 def bastion_edit(request, bastion_id):
     try:
         bastion = get_object_or_404(BastionHost, id=bastion_id)
+        if request.method == 'POST':
+            # 处理表单提交
+            bastion.name = request.POST.get('name')
+            bastion.host = request.POST.get('host')
+            bastion.port = int(request.POST.get('port', 22))
+            bastion.username = request.POST.get('username')
+            bastion.password = request.POST.get('password')
+            bastion.private_key = request.POST.get('private_key')
+            bastion.is_enabled = request.POST.get('is_enabled') == 'on'
+            bastion.memo = request.POST.get('memo')
+            bastion.save()
+            messages.success(request, f'跳板机 {bastion.name} 更新成功')
+            return redirect('bastion_list')
         return render(request, 'cmdb/bastion_form.html', {'bastion': bastion, 'action': 'edit'})
     except Exception as e:
         messages.error(request, f'编辑跳板机失败: {str(e)}')
@@ -979,7 +1080,40 @@ def collect_task_list(request):
 @login_required
 def collect_task_add(request):
     try:
-        return render(request, 'cmdb/collect_task_form.html', {'action': 'add'})
+        bastions = BastionHost.objects.filter(is_enabled=True)
+        if request.method == 'POST':
+            # 处理表单提交
+            bastion_id = request.POST.get('bastion')
+            bastion = BastionHost.objects.get(id=bastion_id) if bastion_id else None
+            
+            task = CollectTask(
+                name=request.POST.get('name'),
+                bastion=bastion,
+                target_hosts=request.POST.get('target_hosts'),
+                collect_online_only=request.POST.get('collect_online_only') == 'on',
+                jump_via_bastion=request.POST.get('jump_via_bastion') == 'on',
+                is_enabled=request.POST.get('is_enabled') == 'on',
+                update_hostname=request.POST.get('update_hostname') == 'on',
+                update_os=request.POST.get('update_os') == 'on',
+                update_cpu=request.POST.get('update_cpu') == 'on',
+                update_memory=request.POST.get('update_memory') == 'on',
+                update_disk=request.POST.get('update_disk') == 'on',
+                update_gpu=request.POST.get('update_gpu') == 'on',
+                update_device_info=request.POST.get('update_device_info') == 'on',
+                update_sn=request.POST.get('update_sn') == 'on',
+                is_auto_collect=request.POST.get('is_auto_collect') == 'on',
+                cron_expression=request.POST.get('cron_expression', '0 2 * * *'),
+                memo=request.POST.get('memo')
+            )
+            task.save()
+            
+            # 如果启用了定时任务，更新调度器
+            if task.is_auto_collect:
+                update_scheduler_job()
+            
+            messages.success(request, f'采集任务 {task.name} 创建成功')
+            return redirect('collect_task_list')
+        return render(request, 'cmdb/collect_task_form.html', {'action': 'add', 'bastions': bastions})
     except Exception as e:
         messages.error(request, f'添加采集任务失败: {str(e)}')
         return redirect('collect_task_list')
@@ -988,7 +1122,37 @@ def collect_task_add(request):
 def collect_task_edit(request, task_id):
     try:
         task = get_object_or_404(CollectTask, id=task_id)
-        return render(request, 'cmdb/collect_task_form.html', {'task': task, 'action': 'edit'})
+        bastions = BastionHost.objects.filter(is_enabled=True)
+        if request.method == 'POST':
+            # 处理表单提交
+            bastion_id = request.POST.get('bastion')
+            bastion = BastionHost.objects.get(id=bastion_id) if bastion_id else None
+            
+            task.name = request.POST.get('name')
+            task.bastion = bastion
+            task.target_hosts = request.POST.get('target_hosts')
+            task.collect_online_only = request.POST.get('collect_online_only') == 'on'
+            task.jump_via_bastion = request.POST.get('jump_via_bastion') == 'on'
+            task.is_enabled = request.POST.get('is_enabled') == 'on'
+            task.update_hostname = request.POST.get('update_hostname') == 'on'
+            task.update_os = request.POST.get('update_os') == 'on'
+            task.update_cpu = request.POST.get('update_cpu') == 'on'
+            task.update_memory = request.POST.get('update_memory') == 'on'
+            task.update_disk = request.POST.get('update_disk') == 'on'
+            task.update_gpu = request.POST.get('update_gpu') == 'on'
+            task.update_device_info = request.POST.get('update_device_info') == 'on'
+            task.update_sn = request.POST.get('update_sn') == 'on'
+            task.is_auto_collect = request.POST.get('is_auto_collect') == 'on'
+            task.cron_expression = request.POST.get('cron_expression', '0 2 * * *')
+            task.memo = request.POST.get('memo')
+            task.save()
+            
+            # 更新调度器
+            update_scheduler_job()
+            
+            messages.success(request, f'采集任务 {task.name} 更新成功')
+            return redirect('collect_task_list')
+        return render(request, 'cmdb/collect_task_form.html', {'task': task, 'action': 'edit', 'bastions': bastions})
     except Exception as e:
         messages.error(request, f'编辑采集任务失败: {str(e)}')
         return redirect('collect_task_list')
@@ -2326,6 +2490,11 @@ def static_asset_list(request):
         except:
             status_list = []
         
+        # 计算统计数据
+        total_count = StaticAsset.objects.count()
+        filtered_count = assets.count()
+        has_filter = keyword or cabinet_filter or department_filter or server_type_filter or status_filter
+        
         return render(request, 'cmdb/static_asset_list.html', {
             'assets': assets,
             'keyword': keyword,
@@ -2334,6 +2503,9 @@ def static_asset_list(request):
             'server_type_filter': server_type_filter,
             'status_filter': status_filter,
             'cabinet_list': cabinet_list,
+            'total_count': total_count,
+            'filtered_count': filtered_count,
+            'has_filter': has_filter,
             'department_list': department_list,
             'server_type_list': server_type_list,
             'status_list': status_list
@@ -2592,6 +2764,13 @@ def export_static_assets_excel(request):
         from openpyxl import Workbook
         from datetime import datetime
         
+        # 获取过滤参数（支持从列表页传递过滤条件）
+        keyword = request.GET.get('keyword', '')
+        cabinet_filter = request.GET.get('cabinet', '')
+        department_filter = request.GET.get('department', '')
+        server_type_filter = request.GET.get('server_type', '')
+        status_filter = request.GET.get('status', '')
+        
         # 创建工作簿
         wb = Workbook()
         ws = wb.active
@@ -2603,6 +2782,34 @@ def export_static_assets_excel(request):
         
         # 获取静态资产数据
         assets = StaticAsset.objects.all()
+        
+        # 应用过滤条件
+        from django.db.models import Q
+        if keyword:
+            assets = assets.filter(
+                Q(serial_number__icontains=keyword) |
+                Q(asset_no__icontains=keyword) |
+                Q(cabinet__icontains=keyword) |
+                Q(department__icontains=keyword) |
+                Q(server_type__icontains=keyword) |
+                Q(ip__icontains=keyword) |
+                Q(contact_person__icontains=keyword) |
+                Q(device_model__icontains=keyword) |
+                Q(server_model__icontains=keyword) |
+                Q(status__icontains=keyword)
+            )
+        
+        if cabinet_filter:
+            assets = assets.filter(cabinet__icontains=cabinet_filter)
+        
+        if department_filter:
+            assets = assets.filter(department__icontains=department_filter)
+        
+        if server_type_filter:
+            assets = assets.filter(server_type__icontains=server_type_filter)
+        
+        if status_filter:
+            assets = assets.filter(status__icontains=status_filter)
         for asset in assets:
             row = [
                 asset.serial_number or '',
@@ -2662,6 +2869,13 @@ def export_static_assets_csv(request):
         import io
         from datetime import datetime
         
+        # 获取过滤参数（支持从列表页传递过滤条件）
+        keyword = request.GET.get('keyword', '')
+        cabinet_filter = request.GET.get('cabinet', '')
+        department_filter = request.GET.get('department', '')
+        server_type_filter = request.GET.get('server_type', '')
+        status_filter = request.GET.get('status', '')
+        
         # 创建内存文件
         output = io.StringIO()
         writer = csv.writer(output)
@@ -2672,6 +2886,34 @@ def export_static_assets_csv(request):
         
         # 获取静态资产数据
         assets = StaticAsset.objects.all()
+        
+        # 应用过滤条件
+        from django.db.models import Q
+        if keyword:
+            assets = assets.filter(
+                Q(serial_number__icontains=keyword) |
+                Q(asset_no__icontains=keyword) |
+                Q(cabinet__icontains=keyword) |
+                Q(department__icontains=keyword) |
+                Q(server_type__icontains=keyword) |
+                Q(ip__icontains=keyword) |
+                Q(contact_person__icontains=keyword) |
+                Q(device_model__icontains=keyword) |
+                Q(server_model__icontains=keyword) |
+                Q(status__icontains=keyword)
+            )
+        
+        if cabinet_filter:
+            assets = assets.filter(cabinet__icontains=cabinet_filter)
+        
+        if department_filter:
+            assets = assets.filter(department__icontains=department_filter)
+        
+        if server_type_filter:
+            assets = assets.filter(server_type__icontains=server_type_filter)
+        
+        if status_filter:
+            assets = assets.filter(status__icontains=status_filter)
         for asset in assets:
             row = [
                 asset.serial_number or '',
@@ -3551,26 +3793,23 @@ def change_password(request):
 @login_required
 @superuser_required
 def user_management(request):
-    users = User.objects.all().order_by('-id')
+    users = User.objects.select_related('userprofile').all().order_by('-id')
     
+    # 确保每个用户都有 UserProfile
     for user in users:
         UserProfile.objects.get_or_create(user=user)
     
+    # 重新获取用户列表
     users = User.objects.select_related('userprofile').all().order_by('-id')
-
-    roles = Role.objects.all()
-    modules = Module.objects.all().order_by('order')
 
     return render(request, 'cmdb/settings.html', {
         'users': users,
-        'roles': roles,
-        'modules': modules,
         'active_tab': 'users'
     })
 
 
 @login_required
-@superuser_required
+@admin_required
 def user_add(request):
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -3578,10 +3817,8 @@ def user_add(request):
         real_name = request.POST.get('real_name', '')
         password = request.POST.get('password')
         confirm_password = request.POST.get('confirm_password')
-        role_id = request.POST.get('role')
         is_active = request.POST.get('is_active', '1') == '1'
-        permissions = request.POST.getlist('permissions')
-        use_role_permissions = request.POST.get('use_role_permissions') == '1'
+        is_admin = request.POST.get('is_admin') == 'on'
 
         if password != confirm_password:
             messages.error(request, '两次输入的密码不一致。')
@@ -3599,15 +3836,10 @@ def user_add(request):
                 is_active=is_active
             )
 
-            permissions_json = ''
-            if not use_role_permissions and permissions:
-                permissions_json = json.dumps(permissions)
-
             UserProfile.objects.create(
                 user=user,
                 real_name=real_name,
-                role_id=role_id if role_id else None,
-                permissions=permissions_json
+                is_admin=is_admin
             )
 
             messages.success(request, f'用户 {username} 创建成功！')
@@ -3616,18 +3848,15 @@ def user_add(request):
             messages.error(request, f'创建用户失败：{str(e)}')
             return redirect('user_add')
 
-    roles = Role.objects.all()
-    modules = Module.objects.filter(is_active=True).order_by('order')
     return render(request, 'cmdb/user_form.html', {
         'user': None,
-        'roles': roles,
-        'modules': modules,
-        'user_permissions': []
+        'profile': None,
+        'is_admin': False
     })
 
 
 @login_required
-@superuser_required
+@admin_required
 def user_edit(request, user_id):
     edit_user = get_object_or_404(User, id=user_id)
 
@@ -3635,24 +3864,27 @@ def user_edit(request, user_id):
         email = request.POST.get('email', '')
         real_name = request.POST.get('real_name', '')
         password = request.POST.get('password')
-        role_id = request.POST.get('role')
         is_active = request.POST.get('is_active', '1') == '1'
-        permissions = request.POST.getlist('permissions')
-        use_role_permissions = request.POST.get('use_role_permissions') == '1'
+        is_admin = request.POST.get('is_admin') == 'on'
+
+        # 检查是否要取消管理员权限，确保至少有一个管理员
+        profile = UserProfile.objects.get_or_create(user=edit_user)[0]
+        current_is_admin = profile.is_admin
+        
+        if current_is_admin and not is_admin:
+            # 检查是否还有其他管理员
+            admin_count = UserProfile.objects.filter(is_admin=True).count()
+            if admin_count <= 1 and not edit_user.is_superuser:
+                messages.error(request, '系统必须至少有一个管理员用户！')
+                return redirect('user_edit', user_id=user_id)
 
         try:
             edit_user.email = email
             edit_user.is_active = is_active
             edit_user.save()
 
-            profile, created = UserProfile.objects.get_or_create(user=edit_user)
             profile.real_name = real_name
-            profile.role_id = role_id if role_id else None
-
-            if use_role_permissions:
-                profile.permissions = ''
-            else:
-                profile.permissions = json.dumps(permissions) if permissions else ''
+            profile.is_admin = is_admin
             profile.save()
 
             if password:
@@ -3664,70 +3896,42 @@ def user_edit(request, user_id):
         except Exception as e:
             messages.error(request, f'更新用户失败：{str(e)}')
 
-    roles = Role.objects.all()
-    modules = Module.objects.filter(is_active=True).order_by('order')
-    
-    profile, created = UserProfile.objects.get_or_create(user=edit_user)
-    
-    # 如果用户有自定义权限，使用自定义权限
-    # 如果没有自定义权限但有角色，使用角色的权限
-    # 否则为空
-    if profile.permissions:
-        user_permissions = json.loads(profile.permissions)
-    elif profile.role:
-        user_permissions = profile.role.get_permissions_list()
-    else:
-        user_permissions = []
+    profile = UserProfile.objects.get_or_create(user=edit_user)[0]
     
     return render(request, 'cmdb/user_form.html', {
         'user': edit_user,
         'profile': profile,
-        'roles': roles,
-        'modules': modules,
-        'user_permissions': user_permissions
+        'is_admin': profile.is_admin
     })
 
 
 @login_required
-@superuser_required
+@admin_required
 def user_permissions(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-
-    if request.user.id == user_id:
-        messages.error(request, '不能修改自己的权限！')
-        return redirect('user_management')
-
-    modules = Module.objects.filter(is_active=True).order_by('order')
-
-    profile, created = UserProfile.objects.get_or_create(user=user)
-
-    if request.method == 'POST':
-        permissions = request.POST.getlist('permissions')
-
-        try:
-            profile.permissions = json.dumps(permissions)
-            profile.save()
-            messages.success(request, f'用户 {user.username} 的权限已更新！')
-            return redirect('user_management')
-        except Exception as e:
-            messages.error(request, f'更新权限失败：{str(e)}')
-
-    user_permissions = json.loads(profile.permissions) if profile.permissions else []
-
-    return render(request, 'cmdb/user_permissions.html', {
-        'user': user,
-        'modules': modules,
-        'user_permissions': user_permissions
-    })
+    # 权限系统已简化，管理员和普通用户的区别仅在于是否能访问系统设置
+    # 此视图保留但重定向到用户编辑页面
+    return redirect('user_edit', user_id=user_id)
 
 
 @login_required
+@admin_required
 def user_disable(request, user_id):
     user = get_object_or_404(User, id=user_id)
 
     if request.user.id == user_id:
         messages.error(request, '不能禁用自己的账户！')
         return redirect('user_management')
+
+    # 检查是否是最后一个管理员
+    try:
+        profile = user.userprofile
+        if profile.is_admin:
+            admin_count = UserProfile.objects.filter(is_admin=True).count()
+            if admin_count <= 1 and not user.is_superuser:
+                messages.error(request, '系统必须至少有一个管理员用户！')
+                return redirect('user_management')
+    except UserProfile.DoesNotExist:
+        pass
 
     user.is_active = False
     user.save()
@@ -3745,13 +3949,24 @@ def user_enable(request, user_id):
 
 
 @login_required
-@superuser_required
+@admin_required
 def user_delete(request, user_id):
     user = get_object_or_404(User, id=user_id)
 
     if request.user.id == user_id:
         messages.error(request, '不能删除自己的账户！')
         return redirect('user_management')
+
+    # 检查是否是最后一个管理员
+    try:
+        profile = user.userprofile
+        if profile.is_admin:
+            admin_count = UserProfile.objects.filter(is_admin=True).count()
+            if admin_count <= 1 and not user.is_superuser:
+                messages.error(request, '系统必须至少有一个管理员用户！')
+                return redirect('user_management')
+    except UserProfile.DoesNotExist:
+        pass
 
     username = user.username
     user.delete()
@@ -3760,126 +3975,66 @@ def user_delete(request, user_id):
 
 
 @login_required
-@superuser_required
+@admin_required
 def role_management(request):
-    roles = Role.objects.all().order_by('-id')
-    modules = Module.objects.filter(is_active=True).order_by('order')
-
-    if request.method == 'POST':
-        action = request.POST.get('action')
-
-        if action == 'add':
-            name = request.POST.get('name')
-            description = request.POST.get('description', '')
-            permissions = request.POST.getlist('permissions')
-
-            try:
-                role = Role.objects.create(
-                    name=name,
-                    description=description,
-                    permissions=json.dumps(permissions)
-                )
-                messages.success(request, f'角色 {name} 创建成功！')
-            except Exception as e:
-                messages.error(request, f'创建角色失败：{str(e)}')
-
-        elif action == 'edit':
-            role_id = request.POST.get('role_id')
-            role = get_object_or_404(Role, id=role_id)
-            name = request.POST.get('name')
-            description = request.POST.get('description', '')
-            permissions = request.POST.getlist('permissions')
-
-            try:
-                role.name = name
-                role.description = description
-                role.permissions = json.dumps(permissions)
-                role.save()
-                messages.success(request, f'角色 {name} 已更新！')
-            except Exception as e:
-                messages.error(request, f'更新角色失败：{str(e)}')
-
-        elif action == 'delete':
-            role_id = request.POST.get('role_id')
-            role = get_object_or_404(Role, id=role_id)
-
-            if UserProfile.objects.filter(role=role).exists():
-                messages.error(request, '该角色已被用户使用，无法删除！')
-            else:
-                role.delete()
-                messages.success(request, '角色已删除！')
-
-        return redirect('role_management')
-
-    return render(request, 'cmdb/settings.html', {
-        'roles': roles,
-        'modules': modules,
-        'active_tab': 'roles'
-    })
+    # 角色管理作为预留功能，当前权限系统简化为管理员/普通用户
+    messages.info(request, '当前系统使用简化的权限模型，仅区分管理员和普通用户。角色管理功能作为预留功能保留。')
+    return redirect('user_management')
 
 
 @login_required
-@superuser_required
+@admin_required
 def permission_management(request):
-    modules = Module.objects.all().order_by('order')
-
-    if request.method == 'POST':
-        action = request.POST.get('action')
-
-        if action == 'add_module':
-            name = request.POST.get('module_name')
-            code = request.POST.get('module_code')
-            order = request.POST.get('module_order', 0)
-            is_active = request.POST.get('module_active', '1') == '1'
-
-            try:
-                Module.objects.create(
-                    name=name,
-                    code=code,
-                    order=order,
-                    is_active=is_active
-                )
-                messages.success(request, f'模块 {name} 创建成功！')
-            except Exception as e:
-                messages.error(request, f'创建模块失败：{str(e)}')
-
-        elif action == 'edit_module':
-            module_id = request.POST.get('module_id')
-            module = get_object_or_404(Module, id=module_id)
-            module.name = request.POST.get('module_name')
-            module.code = request.POST.get('module_code')
-            module.order = request.POST.get('module_order', 0)
-            module.is_active = request.POST.get('module_active', '1') == '1'
-            module.save()
-            messages.success(request, f'模块 {module.name} 已更新！')
-
-        elif action == 'delete_module':
-            module_id = request.POST.get('module_id')
-            module = get_object_or_404(Module, id=module_id)
-            module.delete()
-            messages.success(request, '模块已删除！')
-
-        return redirect('permission_management')
-
-    return render(request, 'cmdb/settings.html', {
-        'modules': modules,
-        'active_tab': 'permissions'
-    })
+    # 权限管理作为预留功能，当前权限系统简化为管理员/普通用户
+    messages.info(request, '当前系统使用简化的权限模型，管理员可以访问系统设置，普通用户不能。权限管理功能作为预留功能保留。')
+    return redirect('user_management')
 
 
-# 备件管理相关视图
+# 服务器备件相关视图
 
 @login_required
 def spareparts_list(request):
     """备件列表页面"""
-    spareparts = SparePart.objects.all().order_by('-created_at')
-    hosts = Host.objects.filter(is_active=True).order_by('name')
+    # 只显示未安装的备件（库存中、维修中、空状态等）
+    spareparts = SparePart.objects.filter(status__in=['in_stock', 'maintenance', 'available', '']).order_by('-created_at')
+    static_assets = StaticAsset.objects.all().order_by('asset_no')
     part_types = SparePartType.objects.filter(is_active=True).order_by('order')
     return render(request, 'cmdb/spareparts/list.html', {
         'spareparts': spareparts,
-        'hosts': hosts,
+        'static_assets': static_assets,
         'part_types': part_types
     })
+
+
+@login_required
+def server_spareparts_list(request):
+    """服务器备件列表页面"""
+    spareparts = SparePart.objects.filter(category='server', status__in=['in_stock', 'maintenance', 'available', '']).order_by('-created_at')
+    static_assets = StaticAsset.objects.all().order_by('asset_no')
+    part_types = SparePartType.objects.filter(is_active=True).order_by('order')
+    return render(request, 'cmdb/spareparts/list.html', {
+        'spareparts': spareparts,
+        'static_assets': static_assets,
+        'part_types': part_types,
+        'category': 'server',
+        'category_name': '服务器备件'
+    })
+
+
+@login_required
+def desktop_spareparts_list(request):
+    """办公机备件列表页面"""
+    spareparts = SparePart.objects.filter(category='desktop', status__in=['in_stock', 'maintenance', 'available', '']).order_by('-created_at')
+    static_assets = StaticAsset.objects.all().order_by('asset_no')
+    part_types = SparePartType.objects.filter(is_active=True).order_by('order')
+    return render(request, 'cmdb/spareparts/list.html', {
+        'spareparts': spareparts,
+        'static_assets': static_assets,
+        'part_types': part_types,
+        'category': 'desktop',
+        'category_name': '办公机备件'
+    })
+
 
 @login_required
 def spareparts_add(request):
@@ -3900,20 +4055,22 @@ def spareparts_add(request):
             if type_id:
                 sparepart.type_id = type_id
             
-            # 处理图片上传
+            # 处理图片上传 - 按年月日创建目录
             images = []
             if request.FILES:
+                import datetime
+                date_dir = datetime.datetime.now().strftime('%Y%m%d')
                 for key in request.FILES:
                     file = request.FILES[key]
                     import uuid
                     ext = file.name.split('.')[-1]
                     filename = f"{uuid.uuid4().hex}.{ext}"
-                    filepath = f'/app/media/spareparts/{filename}'
+                    filepath = os.path.join(settings.MEDIA_ROOT, 'spareparts', date_dir, filename)
                     os.makedirs(os.path.dirname(filepath), exist_ok=True)
                     with open(filepath, 'wb') as f:
                         for chunk in file.chunks():
                             f.write(chunk)
-                    images.append(f'/media/spareparts/{filename}')
+                    images.append(f'/media/spareparts/{date_dir}/{filename}')
             
             if images:
                 sparepart.images = json.dumps(images)
@@ -3951,6 +4108,37 @@ def spareparts_edit(request, sparepart_id):
             else:
                 sparepart.type_id = None
             
+            # 处理图片上传 - 按年月日创建目录
+            # 获取剩余的现有图片路径
+            remaining_images = []
+            if request.POST.get('remaining_images'):
+                try:
+                    remaining_images = json.loads(request.POST.get('remaining_images'))
+                except:
+                    pass
+            
+            # 处理新上传的图片
+            new_image_paths = []
+            if request.FILES.getlist('images'):
+                images = request.FILES.getlist('images')
+                import datetime
+                date_dir = datetime.datetime.now().strftime('%Y%m%d')
+                for img in images:
+                    filename = f"{uuid.uuid4()}_{img.name}"
+                    filepath = os.path.join(settings.MEDIA_ROOT, 'spareparts', date_dir, filename)
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    with open(filepath, 'wb+') as destination:
+                        for chunk in img.chunks():
+                            destination.write(chunk)
+                    new_image_paths.append(f"/media/spareparts/{date_dir}/{filename}")
+            
+            # 合并剩余图片和新上传的图片
+            all_images = remaining_images + new_image_paths
+            if all_images:
+                sparepart.images = json.dumps(all_images)
+            else:
+                sparepart.images = ''
+            
             sparepart.save()
             
             log_operation(request.user, 'update', f'备件: {sparepart.name}', '编辑备件', request.META.get('REMOTE_ADDR'))
@@ -3959,17 +4147,29 @@ def spareparts_edit(request, sparepart_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     # GET请求返回JSON数据
+    images_list = []
+    if sparepart.images:
+        try:
+            images_list = json.loads(sparepart.images)
+        except:
+            pass
+    
     return JsonResponse({
-        'id': sparepart.id,
-        'asset_code': sparepart.asset_code,
-        'name': sparepart.name,
-        'brand': sparepart.brand,
-        'model': sparepart.model,
-        'size': sparepart.size,
-        'serial_number': sparepart.serial_number,
-        'location': sparepart.location,
-        'purchase_date': sparepart.purchase_date.isoformat() if sparepart.purchase_date else None,
-        'type_id': sparepart.type_id
+        'success': True,
+        'data': {
+            'id': sparepart.id,
+            'asset_code': sparepart.asset_code,
+            'name': sparepart.name,
+            'brand': sparepart.brand,
+            'model': sparepart.model,
+            'size': sparepart.size,
+            'serial_number': sparepart.serial_number,
+            'location': sparepart.location,
+            'purchase_date': sparepart.purchase_date.isoformat() if sparepart.purchase_date else None,
+            'type_id': sparepart.type_id,
+            'status': sparepart.status,
+            'images': images_list
+        }
     })
 
 @login_required
@@ -4085,8 +4285,29 @@ def test_sidebar(request):
 @login_required
 def asset_relation_list(request):
     """资产关系列表页面"""
+    search_query = request.GET.get('search', '')
     relations = AssetRelation.objects.filter(is_active=True).select_related('parent_asset', 'child_asset')
-    return render(request, 'cmdb/asset_relation/list.html', {'relations': relations})
+    
+    # 搜索过滤
+    if search_query:
+        relations = relations.filter(
+            Q(parent_asset__asset_no__icontains=search_query) |
+            Q(parent_asset__ip__icontains=search_query) |
+            Q(child_asset__asset_no__icontains=search_query) |
+            Q(child_asset__hostname__icontains=search_query) |
+            Q(child_asset__device_model__icontains=search_query) |
+            Q(child_asset__sn__icontains=search_query) |
+            Q(slot__icontains=search_query)
+        )
+    
+    static_assets = StaticAsset.objects.all().order_by('asset_no')
+    spareparts = SparePart.objects.filter(status='in_stock').order_by('-created_at')
+    return render(request, 'cmdb/asset_relation/list.html', {
+        'relations': relations,
+        'static_assets': static_assets,
+        'spareparts': spareparts,
+        'search_query': search_query
+    })
 
 
 @login_required
@@ -4121,7 +4342,7 @@ def api_get_host_children(request, host_id):
 
 @login_required
 def api_install_component(request):
-    """安装组件到主资产"""
+    """安装已有组件到主资产"""
     if request.method == 'POST':
         try:
             data = request.POST
@@ -4130,48 +4351,50 @@ def api_install_component(request):
             slot = data.get('slot')
             remark = data.get('remark', '')
 
-            # 并发保护检查
             with transaction.atomic():
-                # 检查子资产是否已安装
+                child_host = Host.objects.select_for_update().get(id=child_host_id)
+                parent_host = Host.objects.select_for_update().get(id=parent_host_id)
+
                 existing_relation = AssetRelation.objects.select_for_update()\
                     .filter(child_asset_id=child_host_id, is_active=True).first()
                 if existing_relation:
                     return JsonResponse({'success': False, 'error': '该组件已安装在其他资产上'})
 
-                # 检查槽位是否被占用
                 slot_occupied = AssetRelation.objects.select_for_update()\
                     .filter(parent_asset_id=parent_host_id, slot=slot, is_active=True).exists()
                 if slot_occupied:
                     return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
 
-                # 创建资产关系
                 relation = AssetRelation.objects.create(
-                    parent_asset_id=parent_host_id,
-                    child_asset_id=child_host_id,
+                    parent_asset=parent_host,
+                    child_asset=child_host,
                     slot=slot,
                     is_removable=True,
                     is_active=True
                 )
 
-                # 创建安装历史
                 InstallHistory.objects.create(
                     asset_relation=relation,
+                    parent_asset=parent_host,
+                    child_asset=child_host,
                     install_time=timezone.now(),
                     operator=request.user,
                     operation_type='install',
+                    source_type='direct_purchase',
                     remark=remark
                 )
 
-                # 添加生命周期事件
                 LifecycleEvent.objects.create(
-                    asset_id=child_host_id,
+                    asset=child_host,
                     event_type='deploy',
                     event_time=timezone.now(),
                     operator=request.user,
-                    remark=f'安装到主机 {relation.parent_asset.name} 的 {slot} 槽位'
+                    remark=f'安装到主机 {parent_host.name} 的 {slot} 槽位'
                 )
 
             return JsonResponse({'success': True, 'relation_id': relation.id})
+        except Host.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '主机不存在'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': '只支持POST请求'})
@@ -4184,17 +4407,18 @@ def api_uninstall_component(request):
         try:
             data = request.POST
             relation_id = data.get('relation_id')
-            action = data.get('action')  # 'return_to_spare' 或 'scrap'
+            action = data.get('action')
             remark = data.get('remark', '')
+            sparepart_name = data.get('sparepart_name', '')
 
             with transaction.atomic():
-                relation = AssetRelation.objects.select_for_update().get(id=relation_id)
-                
-                # 更新资产关系状态
+                relation = AssetRelation.objects.select_for_update().select_related('parent_asset', 'child_asset').get(id=relation_id)
+                child_host = relation.child_asset
+                parent_host = relation.parent_asset
+
                 relation.is_active = False
                 relation.save()
 
-                # 更新安装历史
                 history = InstallHistory.objects.filter(asset_relation=relation, uninstall_time__isnull=True).first()
                 if history:
                     history.uninstall_time = timezone.now()
@@ -4204,6 +4428,8 @@ def api_uninstall_component(request):
                 else:
                     InstallHistory.objects.create(
                         asset_relation=relation,
+                        parent_asset=parent_host,
+                        child_asset=child_host,
                         install_time=relation.created_at,
                         uninstall_time=timezone.now(),
                         operator=request.user,
@@ -4211,15 +4437,31 @@ def api_uninstall_component(request):
                         remark=remark
                     )
 
-                # 添加生命周期事件
-                event_type = 'uninstall' if action == 'return_to_spare' else 'scrap'
-                LifecycleEvent.objects.create(
-                    asset=relation.child_asset,
-                    event_type=event_type,
-                    event_time=timezone.now(),
-                    operator=request.user,
-                    remark=remark
-                )
+                if action == 'return_to_spare':
+                    SparePart.objects.create(
+                        name=sparepart_name or child_host.hostname,
+                        model=child_host.device_model or '',
+                        serial_number=child_host.sn or '',
+                        status='in_stock',
+                        is_installed=False,
+                        installed_host_id=None,
+                        installed_slot='',
+                    )
+                    LifecycleEvent.objects.create(
+                        asset=child_host,
+                        event_type='uninstall',
+                        event_time=timezone.now(),
+                        operator=request.user,
+                        remark=f'拆卸返回备件库: {remark}'
+                    )
+                else:
+                    LifecycleEvent.objects.create(
+                        asset=child_host,
+                        event_type='scrap',
+                        event_time=timezone.now(),
+                        operator=request.user,
+                        remark=f'拆卸报废: {remark}'
+                    )
 
             return JsonResponse({'success': True})
         except AssetRelation.DoesNotExist:
@@ -4243,6 +4485,7 @@ def api_get_install_history(request, relation_id):
                 'uninstall_time': h.uninstall_time.strftime('%Y-%m-%d %H:%M:%S') if h.uninstall_time else '',
                 'operator': h.operator.username if h.operator else '',
                 'operation_type': h.get_operation_type_display(),
+                'source_type': h.get_source_type_display() if h.source_type else '',
                 'remark': h.remark
             })
         return JsonResponse({'histories': result})
@@ -4259,41 +4502,49 @@ def api_install_sparepart(request):
         try:
             data = request.POST
             sparepart_id = data.get('sparepart_id')
-            parent_host_id = data.get('parent_host_id')
+            static_asset_id = data.get('parent_host_id')  # 现在是StaticAsset的ID
             slot = data.get('slot')
             remark = data.get('remark', '')
 
             with transaction.atomic():
-                # 检查备件状态
                 sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
-                if sparepart.status != 'in_stock':
-                    return JsonResponse({'success': False, 'error': '备件不在库存中'})
+                # 允许库存中、维修中以及旧状态值的备件进行安装
+                valid_statuses = ['in_stock', 'maintenance', 'available', '']
+                if sparepart.status not in valid_statuses:
+                    return JsonResponse({'success': False, 'error': f'备件当前状态为"{dict(SparePart.STATUS_CHOICES).get(sparepart.status, sparepart.status)}"，无法安装'})
 
-                # 检查槽位是否被占用
-                slot_occupied = AssetRelation.objects.select_for_update()\
-                    .filter(parent_asset_id=parent_host_id, slot=slot, is_active=True).exists()
-                if slot_occupied:
-                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
-
-                # 检查主机是否存在
-                parent_host = Host.objects.get(id=parent_host_id)
-
-                # 创建资产关系（子资产用备件名称创建临时记录，或者需要先在Host中创建记录）
-                # 这里我们假设备件对应的组件已经在Host中存在，或者需要创建
-                # 为了简化，我们直接创建资产关系，使用备件信息
-
-                # 创建子资产Host记录（如果不存在）
-                child_host, created = Host.objects.get_or_create(
-                    name=sparepart.name,
+                # 获取静态资产信息
+                static_asset = StaticAsset.objects.select_for_update().get(id=static_asset_id)
+                
+                # 根据静态资产找到或创建对应的Host记录
+                parent_host, created = Host.objects.get_or_create(
+                    asset_no=static_asset.asset_no,
                     defaults={
-                        'model': sparepart.model,
-                        'serial_number': sparepart.serial_number,
-                        'idc': parent_host.idc,
-                        'cabinet': parent_host.cabinet,
+                        'hostname': static_asset.asset_no or f"host-{static_asset.id}",
+                        'ip': static_asset.ip or '0.0.0.0',
+                        'device_model': static_asset.device_model,
+                        'status': static_asset.status
                     }
                 )
 
-                # 创建资产关系
+                slot_occupied = AssetRelation.objects.select_for_update()\
+                    .filter(parent_asset_id=parent_host.id, slot=slot, is_active=True).exists()
+                if slot_occupied:
+                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
+
+                hostname = f"component-{sparepart.id}-{sparepart.name.replace(' ', '-').lower()}-{int(timezone.now().timestamp())}"
+                child_host, created = Host.objects.get_or_create(
+                    hostname=hostname,
+                    defaults={
+                        'device_model': sparepart.model,
+                        'sn': sparepart.serial_number,
+                        'ip': '0.0.0.0',
+                        'memo': sparepart.name,  # 设置显示名称为备件名称
+                        'asset_no': sparepart.asset_code,  # 备件资产编号
+                        'images': sparepart.images  # 备件图片
+                    }
+                )
+
                 relation = AssetRelation.objects.create(
                     parent_asset=parent_host,
                     child_asset=child_host,
@@ -4302,29 +4553,29 @@ def api_install_sparepart(request):
                     is_active=True
                 )
 
-                # 创建安装历史
                 InstallHistory.objects.create(
                     asset_relation=relation,
+                    parent_asset=parent_host,
+                    child_asset=child_host,
                     install_time=timezone.now(),
                     operator=request.user,
                     operation_type='install',
-                    remark=remark
+                    source_type='spare',
+                    remark=f'从备件库安装: {sparepart.name}'
                 )
 
-                # 更新备件状态
                 sparepart.status = 'installed'
                 sparepart.is_installed = True
-                sparepart.installed_host_id = parent_host_id
+                sparepart.installed_host_id = parent_host.id
                 sparepart.installed_slot = slot
                 sparepart.save()
 
-                # 添加生命周期事件
                 LifecycleEvent.objects.create(
                     asset=child_host,
                     event_type='deploy',
                     event_time=timezone.now(),
                     operator=request.user,
-                    remark=f'从备件库安装到主机 {parent_host.name} 的 {slot} 槽位'
+                    remark=f'从备件库安装到主机 {parent_host.hostname} 的 {slot} 槽位'
                 )
 
             return JsonResponse({'success': True, 'relation_id': relation.id})
@@ -4337,6 +4588,352 @@ def api_install_sparepart(request):
     return JsonResponse({'success': False, 'error': '只支持POST请求'})
 
 
+@login_required
+def api_direct_install_component(request):
+    """直接安装新组件（未经过备件库）"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            static_asset_id = data.get('parent_host_id')  # 现在是StaticAsset的ID
+            component_name = data.get('component_name')
+            component_asset_no = data.get('component_asset_no', '')  # 新增字段
+            component_model = data.get('component_model', '')
+            component_sn = data.get('component_sn', '')
+            slot = data.get('slot', '')
+            is_removable = data.get('is_removable', 'true').lower() == 'true'
+            purchase_order_no = data.get('purchase_order_no', '')
+            install_time_str = data.get('install_time', '')
+            remark = data.get('remark', '')
+
+            with transaction.atomic():
+                # 获取静态资产信息
+                static_asset = StaticAsset.objects.select_for_update().get(id=static_asset_id)
+                
+                # 根据静态资产找到或创建对应的Host记录
+                parent_host, created = Host.objects.get_or_create(
+                    asset_no=static_asset.asset_no,
+                    defaults={
+                        'hostname': static_asset.asset_no or f"host-{static_asset.id}",
+                        'ip': static_asset.ip or '0.0.0.0',
+                        'device_model': static_asset.device_model,
+                        'status': static_asset.status
+                    }
+                )
+
+                slot_occupied = AssetRelation.objects.select_for_update()\
+                    .filter(parent_asset_id=parent_host.id, slot=slot, is_active=True).exists()
+                if slot_occupied:
+                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
+
+                # 获取用户输入的显示名称（可以重复）
+                component_display_name = data.get('component_display_name', '').strip()
+                
+                # 自动生成唯一的hostname
+                host_identifier = static_asset.asset_no or static_asset.ip or str(static_asset.id)
+                hostname = f"direct-{host_identifier}-{component_name.replace(' ', '-').lower()}-{int(timezone.now().timestamp())}"
+                
+                child_host = Host.objects.create(
+                    hostname=hostname,
+                    memo=component_display_name or component_name,  # 使用memo字段存储显示名称
+                    asset_no=component_asset_no,  # 使用资产编号
+                    device_model=component_model,
+                    sn=component_sn,
+                    ip='0.0.0.0'
+                )
+
+                relation = AssetRelation.objects.create(
+                    parent_asset=parent_host,
+                    child_asset=child_host,
+                    slot=slot,
+                    is_removable=is_removable,
+                    is_active=True
+                )
+
+                install_time = timezone.now()
+                if install_time_str:
+                    try:
+                        from datetime import datetime
+                        install_time = datetime.strptime(install_time_str, '%Y-%m-%dT%H:%M')
+                        from django.utils.timezone import make_aware
+                        install_time = make_aware(install_time)
+                    except:
+                        pass
+
+                InstallHistory.objects.create(
+                    asset_relation=relation,
+                    parent_asset=parent_host,
+                    child_asset=child_host,
+                    install_time=install_time,
+                    operator=request.user,
+                    operation_type='direct_install',
+                    source_type='direct_purchase',
+                    purchase_order_no=purchase_order_no or None,
+                    remark=remark or f'直接采购安装'
+                )
+
+                LifecycleEvent.objects.create(
+                    asset=child_host,
+                    event_type='purchase',
+                    event_time=install_time,
+                    operator=request.user,
+                    remark=f'直接采购安装到 {parent_host.hostname} 的 {slot} 槽位'
+                )
+
+                LifecycleEvent.objects.create(
+                    asset=child_host,
+                    event_type='deploy',
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=f'安装到主机 {parent_host.hostname} 的 {slot} 槽位'
+                )
+
+            return JsonResponse({'success': True, 'relation_id': relation.id})
+        except StaticAsset.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '静态资产不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_get_relation_detail(request):
+    """获取资产关系详情"""
+    if request.method == 'GET':
+        try:
+            relation_id = request.GET.get('relation_id')
+            relation = AssetRelation.objects.select_related('child_asset').get(id=relation_id)
+            
+            data = {
+                'id': relation.id,
+                'slot': relation.slot,
+                'child_asset': {
+                    'id': relation.child_asset.id,
+                    'hostname': relation.child_asset.hostname,
+                    'asset_no': relation.child_asset.asset_no,
+                    'name': relation.child_asset.memo,  # 返回memo字段作为显示名称
+                    'brand': relation.child_asset.brand,
+                    'device_model': relation.child_asset.device_model,
+                    'sn': relation.child_asset.sn,
+                    'images': relation.child_asset.get_images_list()
+                }
+            }
+            return JsonResponse({'success': True, 'data': data})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持GET请求'})
+
+
+@login_required
+def api_edit_relation(request):
+    """编辑资产关系"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            asset_no = data.get('asset_no', '')
+            name = data.get('name', '')  # 修改为显示名称
+            brand = data.get('brand', '')
+            device_model = data.get('device_model', '')
+            sn = data.get('sn', '')
+            slot = data.get('slot', '')
+
+            with transaction.atomic():
+                relation = AssetRelation.objects.select_for_update().get(id=relation_id)
+                
+                # 记录变更信息用于历史记录
+                changes = []
+                
+                # 更新子资产信息
+                if asset_no and asset_no != relation.child_asset.asset_no:
+                    changes.append(f"资产编号: {relation.child_asset.asset_no or '-'} -> {asset_no}")
+                    relation.child_asset.asset_no = asset_no
+                if name and name != relation.child_asset.memo:
+                    changes.append(f"显示名称: {relation.child_asset.memo or '-'} -> {name}")
+                    relation.child_asset.memo = name  # 使用memo字段存储显示名称
+                if brand and brand != relation.child_asset.brand:
+                    changes.append(f"品牌: {relation.child_asset.brand or '-'} -> {brand}")
+                    relation.child_asset.brand = brand
+                if device_model and device_model != relation.child_asset.device_model:
+                    changes.append(f"型号: {relation.child_asset.device_model or '-'} -> {device_model}")
+                    relation.child_asset.device_model = device_model
+                if sn and sn != relation.child_asset.sn:
+                    changes.append(f"序列号: {relation.child_asset.sn or '-'} -> {sn}")
+                    relation.child_asset.sn = sn
+                
+                # 处理图片上传 - 按年月日创建目录
+                # 获取剩余的现有图片路径
+                remaining_images = []
+                if request.POST.get('remaining_images'):
+                    try:
+                        remaining_images = json.loads(request.POST.get('remaining_images'))
+                    except:
+                        pass
+                
+                # 处理新上传的图片
+                new_images = []
+                if request.FILES:
+                    import datetime
+                    date_dir = datetime.datetime.now().strftime('%Y%m%d')
+                    for key in request.FILES:
+                        file = request.FILES[key]
+                        import uuid
+                        ext = file.name.split('.')[-1]
+                        filename = f"{uuid.uuid4().hex}.{ext}"
+                        filepath = os.path.join(settings.MEDIA_ROOT, 'spareparts', date_dir, filename)
+                        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                        with open(filepath, 'wb') as f:
+                            for chunk in file.chunks():
+                                f.write(chunk)
+                        new_images.append(f'/media/spareparts/{date_dir}/{filename}')
+                
+                # 合并剩余图片和新上传的图片
+                all_images = remaining_images + new_images
+                if all_images:
+                    relation.child_asset.images = json.dumps(all_images)
+                    if new_images:
+                        changes.append(f"添加图片: {len(new_images)} 张")
+                else:
+                    relation.child_asset.images = ''
+                
+                relation.child_asset.save()
+                
+                # 更新槽位信息
+                if slot and slot != relation.slot:
+                    # 检查新槽位是否被占用
+                    slot_occupied = AssetRelation.objects.select_for_update()\
+                        .filter(parent_asset_id=relation.parent_asset_id, slot=slot, is_active=True)\
+                        .exclude(id=relation_id).exists()
+                    if slot_occupied:
+                        return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
+                    
+                    changes.append(f"槽位: {relation.slot or '-'} -> {slot}")
+                    relation.slot = slot
+                    relation.save()
+                elif slot:
+                    if slot != relation.slot:
+                        changes.append(f"槽位: {relation.slot or '-'} -> {slot}")
+                    relation.slot = slot
+                    relation.save()
+                else:
+                    relation.save()
+                
+                # 如果有任何变更，记录历史
+                if changes:
+                    LifecycleEvent.objects.create(
+                        asset=relation.child_asset,
+                        event_type='maintenance',
+                        event_time=timezone.now(),
+                        operator=request.user,
+                        remark="编辑资产关系: " + "; ".join(changes)
+                    )
+
+            return JsonResponse({'success': True})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+# ==================== 资产关系管理 ====================
+
+@login_required
+def api_remove_relation(request):
+    """拆卸组件 - 标记资产关系为非活跃"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            action = data.get('action', 'uninstall')  # uninstall: 拆卸, scrap: 报废
+
+            with transaction.atomic():
+                relation = AssetRelation.objects.select_for_update().get(id=relation_id)
+                
+                # 标记为非活跃
+                relation.is_active = False
+                relation.save()
+                
+                # 添加生命周期事件
+                event_type = 'uninstall' if action == 'uninstall' else 'scrap'
+                remark = f"从主机 {relation.parent_asset.asset_no} 拆卸" if action == 'uninstall' else f"报废"
+                
+                LifecycleEvent.objects.create(
+                    asset=relation.child_asset,
+                    event_type=event_type,
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=remark
+                )
+
+            return JsonResponse({'success': True})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_get_relation_history(request):
+    """获取资产关系的安装历史"""
+    if request.method == 'GET':
+        try:
+            relation_id = request.GET.get('relation_id')
+            relation = AssetRelation.objects.select_related('child_asset').get(id=relation_id)
+            
+            # 获取子资产的所有生命周期事件
+            events = LifecycleEvent.objects.filter(asset_id=relation.child_asset.id)\
+                .select_related('operator').order_by('-event_time')
+            
+            result = []
+            for event in events:
+                result.append({
+                    'id': event.id,
+                    'event_type': event.get_event_type_display(),
+                    'event_time': event.event_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'operator': event.operator.username if event.operator else '',
+                    'remark': event.remark
+                })
+            
+            return JsonResponse({'success': True, 'data': result})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持GET请求'})
+
+
+@login_required
+def api_get_asset_lifecycle(request):
+    """获取资产的生命周期历史记录"""
+    if request.method == 'GET':
+        try:
+            asset_id = request.GET.get('asset_id')
+            
+            # 获取资产的所有生命周期事件
+            events = LifecycleEvent.objects.filter(asset_id=asset_id)\
+                .select_related('operator').order_by('-event_time')
+            
+            result = []
+            for event in events:
+                result.append({
+                    'id': event.id,
+                    'event_type': event.event_type,
+                    'event_type_display': event.get_event_type_display(),
+                    'event_time': event.event_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'operator': event.operator.username if event.operator else '',
+                    'remark': event.remark if event.remark else '',
+                    'created_at': event.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                })
+            
+            return JsonResponse({'success': True, 'data': result})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持GET请求'})
+
+
 # ==================== 生命周期管理 ====================
 
 @login_required
@@ -4344,7 +4941,11 @@ def lifecycle_event_list(request):
     """生命周期事件列表页面"""
     events = LifecycleEvent.objects.select_related('asset', 'operator')\
         .order_by('-event_time')
-    return render(request, 'cmdb/lifecycle/list.html', {'events': events})
+    static_assets = StaticAsset.objects.all().order_by('asset_no')
+    return render(request, 'cmdb/lifecycle/list.html', {
+        'events': events,
+        'static_assets': static_assets
+    })
 
 
 @login_required
@@ -4365,23 +4966,511 @@ def api_get_lifecycle_events(request, host_id):
 
 
 @login_required
+def uninstalled_hardware_list(request):
+    """已拆卸硬件列表页面"""
+    search_query = request.GET.get('search', '')
+    
+    # 获取所有已拆卸但未退库的资产关系
+    uninstalled_relations = AssetRelation.objects.filter(is_active=False, is_returned=False)\
+        .select_related('parent_asset', 'child_asset')\
+    
+    # 如果有搜索条件，进行过滤
+    if search_query:
+        uninstalled_relations = uninstalled_relations.filter(
+            Q(parent_asset__asset_no__icontains=search_query) |
+            Q(child_asset__asset_no__icontains=search_query) |
+            Q(child_asset__hostname__icontains=search_query) |
+            Q(child_asset__memo__icontains=search_query) |
+            Q(child_asset__device_model__icontains=search_query) |
+            Q(child_asset__sn__icontains=search_query)
+        )
+    
+    uninstalled_relations = uninstalled_relations.order_by('-updated_at')
+    
+    return render(request, 'cmdb/asset_relation/uninstalled_list.html', {
+        'relations': uninstalled_relations,
+        'search_query': search_query
+    })
+
+
+@login_required
+def api_add_to_spareparts(request):
+    """将已拆卸的硬件添加到备件库"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            status = data.get('status', 'in_stock')
+            
+            # 状态映射：前端值 -> 模型值
+            status_mapping = {
+                'in_stock': 'in_stock',    # 正常库存 -> 库存中
+                'defective': 'maintenance', # 待维修 -> 维修中
+                'scrap': 'scrapped'        # 报废 -> 已报废
+            }
+            # 使用映射后的值，如果没有映射则使用默认值
+            mapped_status = status_mapping.get(status, 'in_stock')
+            
+            with transaction.atomic():
+                relation = AssetRelation.objects.select_related('child_asset').get(id=relation_id)
+                child_asset = relation.child_asset
+                
+                # 检查是否已经添加到备件库
+                if relation.is_returned:
+                    return JsonResponse({'success': False, 'error': '该设备已经添加到备件库，请勿重复添加'})
+                
+                # 创建备件记录
+                sparepart = SparePart.objects.create(
+                    name=child_asset.memo or child_asset.hostname,
+                    brand='',
+                    model=child_asset.device_model or '',
+                    serial_number=child_asset.sn or '',
+                    size='',
+                    status=mapped_status,
+                    location='',
+                    is_installed=False,
+                    installed_host_id=None,
+                    installed_slot='',
+                    purchase_date=None
+                )
+                
+                # 标记为已退库（添加到备件库）
+                relation.is_returned = True
+                relation.returned_at = timezone.now()
+                relation.save()
+                
+                # 添加生命周期事件
+                LifecycleEvent.objects.create(
+                    asset=child_asset,
+                    event_type='maintenance',
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=f'已添加到备件库，状态: {sparepart.get_status_display()}'
+                )
+                
+                log_operation(request.user, 'create', f'备件: {sparepart.name}', '从已拆卸硬件添加备件', request.META.get('REMOTE_ADDR'))
+            
+            return JsonResponse({'success': True, 'message': '已成功添加到备件库'})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def returned_devices_list(request):
+    """已退库设备列表页面"""
+    search_query = request.GET.get('search', '')
+    
+    # 获取所有已退库的资产关系
+    returned_relations = AssetRelation.objects.filter(is_returned=True)\
+        .select_related('parent_asset', 'child_asset')
+    
+    # 如果有搜索条件，进行过滤
+    if search_query:
+        returned_relations = returned_relations.filter(
+            Q(parent_asset__asset_no__icontains=search_query) |
+            Q(child_asset__asset_no__icontains=search_query) |
+            Q(child_asset__hostname__icontains=search_query) |
+            Q(child_asset__memo__icontains=search_query) |
+            Q(child_asset__device_model__icontains=search_query) |
+            Q(child_asset__sn__icontains=search_query)
+        )
+    
+    returned_relations = returned_relations.order_by('-returned_at')
+    
+    return render(request, 'cmdb/asset_relation/returned_list.html', {
+        'relations': returned_relations,
+        'search_query': search_query
+    })
+
+
+@login_required
+def api_batch_return_to_warehouse(request):
+    """批量退库API"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_ids = data.getlist('relation_ids[]')
+            
+            if not relation_ids:
+                return JsonResponse({'success': False, 'error': '请选择要退库的设备'})
+            
+            with transaction.atomic():
+                for relation_id in relation_ids:
+                    relation = AssetRelation.objects.get(id=relation_id)
+                    
+                    # 检查是否已经退库
+                    if relation.is_returned:
+                        continue
+                    
+                    # 标记为已退库
+                    relation.is_returned = True
+                    relation.returned_at = timezone.now()
+                    relation.save()
+                    
+                    # 添加生命周期事件
+                    LifecycleEvent.objects.create(
+                        asset=relation.child_asset,
+                        event_type='maintenance',
+                        event_time=timezone.now(),
+                        operator=request.user,
+                        remark=f'已退库'
+                    )
+                
+                log_operation(request.user, 'update', f'批量退库 {len(relation_ids)} 个设备', '批量退库操作', request.META.get('REMOTE_ADDR'))
+            
+            return JsonResponse({'success': True, 'message': f'已成功退库 {len(relation_ids)} 个设备'})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_cancel_return(request):
+    """取消退库API"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            
+            with transaction.atomic():
+                relation = AssetRelation.objects.get(id=relation_id)
+                
+                # 检查是否已退库
+                if not relation.is_returned:
+                    return JsonResponse({'success': False, 'error': '设备尚未退库'})
+                
+                # 取消退库
+                relation.is_returned = False
+                relation.returned_at = None
+                relation.save()
+                
+                # 添加生命周期事件
+                LifecycleEvent.objects.create(
+                    asset=relation.child_asset,
+                    event_type='maintenance',
+                    event_time=timezone.now(),
+                    operator=request.user,
+                    remark=f'取消退库'
+                )
+                
+                log_operation(request.user, 'update', f'取消退库: {relation.child_asset.memo or relation.child_asset.hostname}', '取消退库操作', request.META.get('REMOTE_ADDR'))
+            
+            return JsonResponse({'success': True, 'message': '已成功取消退库，设备已恢复到已拆卸状态'})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_delete_returned_record(request):
+    """删除已退库记录API"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            relation_id = data.get('relation_id')
+            
+            with transaction.atomic():
+                relation = AssetRelation.objects.select_related('child_asset').get(id=relation_id)
+                child_asset_name = relation.child_asset.memo or relation.child_asset.hostname
+                
+                # 删除资产关系记录
+                relation.delete()
+                
+                log_operation(request.user, 'delete', f'删除已退库记录: {child_asset_name}', '删除已退库记录', request.META.get('REMOTE_ADDR'))
+            
+            return JsonResponse({'success': True, 'message': '已成功删除记录'})
+        except AssetRelation.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '资产关系不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
 def api_add_lifecycle_event(request):
     """添加生命周期事件"""
     if request.method == 'POST':
         try:
             data = request.POST
-            asset_id = data.get('asset_id')
+            static_asset_id = data.get('asset_id')  # 现在是StaticAsset的ID
             event_type = data.get('event_type')
             remark = data.get('remark', '')
 
+            # 获取静态资产信息
+            static_asset = StaticAsset.objects.get(id=static_asset_id)
+            
+            # 根据静态资产找到或创建对应的Host记录
+            host, created = Host.objects.get_or_create(
+                asset_no=static_asset.asset_no,
+                defaults={
+                    'hostname': static_asset.asset_no or f"host-{static_asset.id}",
+                    'ip': static_asset.ip or '0.0.0.0',
+                    'device_model': static_asset.device_model,
+                    'status': static_asset.status
+                }
+            )
+
             event = LifecycleEvent.objects.create(
-                asset_id=asset_id,
+                asset=host,
                 event_type=event_type,
                 event_time=timezone.now(),
                 operator=request.user,
                 remark=remark
             )
             return JsonResponse({'success': True, 'event_id': event.id})
+        except StaticAsset.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '静态资产不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_delete_lifecycle_event(request, event_id):
+    """删除生命周期事件"""
+    if request.method == 'POST':
+        try:
+            event = LifecycleEvent.objects.get(id=event_id)
+            event.delete()
+            return JsonResponse({'success': True})
+        except LifecycleEvent.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '生命周期事件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def api_batch_delete_lifecycle_events(request):
+    """批量删除生命周期事件"""
+    if request.method == 'POST':
+        try:
+            import json
+            data = json.loads(request.body)
+            event_ids = data.get('event_ids', [])
+            
+            if not event_ids:
+                return JsonResponse({'success': False, 'error': '请选择要删除的记录'})
+            
+            LifecycleEvent.objects.filter(id__in=event_ids).delete()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+# ==================== 办公机配件管理 ====================
+
+@login_required
+def office_parts_list(request):
+    """办公机配件列表页面"""
+    parts = OfficePart.objects.all().order_by('-created_at')
+    
+    # 搜索和筛选
+    search_keyword = request.GET.get('keyword', '')
+    category_filter = request.GET.get('category', '')
+    status_filter = request.GET.get('status', '')
+    health_filter = request.GET.get('health', '')
+    
+    if search_keyword:
+        parts = parts.filter(
+            Q(name__icontains=search_keyword) |
+            Q(brand__icontains=search_keyword) |
+            Q(model__icontains=search_keyword) |
+            Q(serial_number__icontains=search_keyword) |
+            Q(source_computer__icontains=search_keyword)
+        )
+    
+    if category_filter:
+        parts = parts.filter(category=category_filter)
+    
+    if status_filter:
+        parts = parts.filter(status=status_filter)
+    
+    context = {
+        'parts': parts,
+        'search_keyword': search_keyword,
+        'category_filter': category_filter,
+        'status_filter': status_filter,
+        'categories': OfficePart.CATEGORY_CHOICES,
+        'statuses': OfficePart.STATUS_CHOICES,
+    }
+    return render(request, 'cmdb/office_parts/list.html', context)
+
+
+@login_required
+def office_part_add(request):
+    """添加办公机配件"""
+    if request.method == 'POST':
+        try:
+            part = OfficePart()
+            part.name = request.POST.get('name')
+            part.category = request.POST.get('category', 'other')
+            part.brand = request.POST.get('brand', '')
+            part.model = request.POST.get('model', '')
+            part.serial_number = request.POST.get('serial_number') or None
+            part.source_computer = request.POST.get('source_computer', '')
+            part.status = request.POST.get('status', 'in_stock')
+            part.dismantle_date = request.POST.get('dismantle_date') or None
+            part.location = request.POST.get('location', '')
+            part.purchase_date = request.POST.get('purchase_date') or None
+            part.remark = request.POST.get('remark', '')
+            
+            # 处理图片上传 - 按年月日创建目录
+            images = []
+            if request.FILES:
+                import datetime
+                date_dir = datetime.datetime.now().strftime('%Y%m%d')
+                for key in request.FILES:
+                    file = request.FILES[key]
+                    import uuid
+                    ext = file.name.split('.')[-1]
+                    filename = f"{uuid.uuid4().hex}.{ext}"
+                    filepath = os.path.join(settings.MEDIA_ROOT, 'spareparts', date_dir, filename)
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    with open(filepath, 'wb') as f:
+                        for chunk in file.chunks():
+                            f.write(chunk)
+                    images.append(f'/media/spareparts/{date_dir}/{filename}')
+            
+            if images:
+                part.images = json.dumps(images)
+            
+            part.save()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_part_edit(request, part_id):
+    """编辑办公机配件"""
+    if request.method == 'GET':
+        try:
+            part = OfficePart.objects.get(id=part_id)
+            return JsonResponse({
+                'success': True,
+                'data': {
+                    'id': part.id,
+                    'name': part.name,
+                    'category': part.category,
+                    'brand': part.brand,
+                    'model': part.model,
+                    'serial_number': part.serial_number or '',
+                    'source_computer': part.source_computer,
+                    'status': part.status,
+                    'dismantle_date': part.dismantle_date.strftime('%Y-%m-%d') if part.dismantle_date else '',
+                    'location': part.location,
+                    'purchase_date': part.purchase_date.strftime('%Y-%m-%d') if part.purchase_date else '',
+                    'remark': part.remark,
+                    'images': part.get_images_list(),
+                }
+            })
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+    elif request.method == 'POST':
+        try:
+            part = OfficePart.objects.get(id=part_id)
+            part.name = request.POST.get('name')
+            part.category = request.POST.get('category', 'other')
+            part.brand = request.POST.get('brand', '')
+            part.model = request.POST.get('model', '')
+            part.serial_number = request.POST.get('serial_number') or None
+            part.source_computer = request.POST.get('source_computer', '')
+            part.status = request.POST.get('status', 'in_stock')
+            part.dismantle_date = request.POST.get('dismantle_date') or None
+            part.location = request.POST.get('location', '')
+            part.purchase_date = request.POST.get('purchase_date') or None
+            part.remark = request.POST.get('remark', '')
+            
+            # 处理图片上传 - 追加到现有图片
+            if request.FILES:
+                # 获取现有图片列表
+                existing_images = part.get_images_list()
+                new_images = []
+                import datetime
+                date_dir = datetime.datetime.now().strftime('%Y%m%d')
+                for key in request.FILES:
+                    file = request.FILES[key]
+                    import uuid
+                    ext = file.name.split('.')[-1]
+                    filename = f"{uuid.uuid4().hex}.{ext}"
+                    filepath = os.path.join(settings.MEDIA_ROOT, 'spareparts', date_dir, filename)
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    with open(filepath, 'wb') as f:
+                        for chunk in file.chunks():
+                            f.write(chunk)
+                    new_images.append(f'/media/spareparts/{date_dir}/{filename}')
+                
+                if new_images:
+                    # 追加到现有图片
+                    all_images = existing_images + new_images
+                    part.images = json.dumps(all_images)
+            
+            part.save()
+            return JsonResponse({'success': True})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持GET和POST请求'})
+
+
+@login_required
+def office_part_delete(request, part_id):
+    """删除办公机配件"""
+    if request.method == 'POST':
+        try:
+            part = OfficePart.objects.get(id=part_id)
+            part.delete()
+            return JsonResponse({'success': True})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_part_update_status(request):
+    """更新配件状态"""
+    if request.method == 'POST':
+        try:
+            part_id = request.POST.get('part_id')
+            new_status = request.POST.get('status')
+            
+            part = OfficePart.objects.get(id=part_id)
+            part.status = new_status
+            part.save()
+            return JsonResponse({'success': True})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_part_batch_delete(request):
+    """批量删除办公机配件"""
+    if request.method == 'POST':
+        try:
+            import json
+            ids = json.loads(request.POST.get('ids', '[]'))
+            
+            if not ids:
+                return JsonResponse({'success': False, 'error': '请选择要删除的配件'})
+            
+            OfficePart.objects.filter(id__in=ids).delete()
+            return JsonResponse({'success': True})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': '只支持POST请求'})

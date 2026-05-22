@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+
+{% block title %}已拆卸硬件管理{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>🔧 已拆卸硬件管理</h2>
+        <p class="text-muted">查看所有已从主机上拆卸下来但尚未退库的硬件组件</p>
+    </div>
+    <div class="card-body">
+        <!-- 搜索框和操作按钮 -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <form method="GET" action="" class="form-inline">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" placeholder="搜索资产编号、名称、型号、SN..." value="{{ search_query }}">
+                        <button type="submit" class="btn btn-primary">搜索</button>
+                        {% if search_query %}
+                        <a href="{% url 'uninstalled_hardware_list' %}" class="btn btn-secondary">重置</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+            <div class="col-md-4 text-right">
+                <a href="{% url 'returned_devices_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-warehouse"></i> 已退库设备
+                </a>
+            </div>
+        </div>
+
+        <!-- 批量操作栏 -->
+        <div class="form-inline mb-4">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()">
+                <label class="form-check-label" for="selectAll">全选</label>
+            </div>
+            <button type="button" class="btn btn-primary ml-3" onclick="batchReturnToWarehouse()" id="batchReturnBtn" disabled>
+                <i class="fas fa-warehouse"></i> 批量退库
+            </button>
+        </div>
+
+        <!-- 数据表格 -->
+        <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" class="form-check-input" id="headerCheckbox" onchange="toggleSelectAll()"></th>
+                    <th>原主资产编号</th>
+                    <th>子资产编号</th>
+                    <th>子资产名称</th>
+                    <th>型号</th>
+                    <th>SN</th>
+                    <th>原槽位</th>
+                    <th>拆卸时间</th>
+                    <th>图片</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for relation in relations %}
+                <tr>
+                    <td><input type="checkbox" class="form-check-input relation-checkbox" value="{{ relation.id }}"></td>
+                    <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.asset_no|default:"-" }}</td>
+                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname }}</td>
+                    <td>{{ relation.child_asset.device_model|default:"-" }}</td>
+                    <td>{{ relation.child_asset.sn|default:"-" }}</td>
+                    <td>{{ relation.slot|default:"-" }}</td>
+                    <td>{{ relation.updated_at|date:"Y-m-d H:i:s" }}</td>
+                    <td>
+                        {% if relation.child_asset.images %}
+                            {% for img in relation.child_asset.get_images_list %}
+                                <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
+                            {% endfor %}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-install" onclick="addToSpareparts({{ relation.id }})">添加到备件库</button>
+                        <button type="button" class="btn btn-sm btn-disable" onclick="singleReturnToWarehouse({{ relation.id }})">退库</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="text-center">暂无已拆卸且未退库的硬件记录</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- 添加到备件库模态框 -->
+<div class="modal fade" id="addToSpareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加到备件库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addToSpareForm">
+                    <input type="hidden" id="relation_id" name="relation_id">
+                    <div class="mb-3">
+                        <label for="status" class="form-label">备件状态</label>
+                        <select class="form-select" id="status" name="status" required>
+                            <option value="in_stock">正常库存</option>
+                            <option value="defective">待维修</option>
+                            <option value="scrap">报废</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>提示：</strong>如果硬件正常可用，请选择"正常库存"；如果有故障需要维修，请选择"待维修"；如果已损坏无法修复，请选择"报废"。
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddToSpare()">确认添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addToSpareparts(relationId) {
+    document.getElementById('relation_id').value = relationId;
+    $('#addToSpareModal').modal('show');
+}
+
+function submitAddToSpare() {
+    var relationId = document.getElementById('relation_id').value;
+    var status = document.getElementById('status').value;
+    
+    $.post('/cmdb/api/add_to_spareparts/', {
+        relation_id: relationId,
+        status: status,
+        csrfmiddlewaretoken: '{{ csrf_token }}'
+    }, function(data) {
+        if (data.success) {
+            alert(data.message);
+            $('#addToSpareModal').modal('hide');
+            location.reload();
+        } else {
+            alert('添加失败: ' + data.error);
+        }
+    });
+}
+
+function toggleSelectAll() {
+    var checkboxes = document.querySelectorAll('.relation-checkbox');
+    var selectAll = document.getElementById('selectAll');
+    
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateBatchButton();
+}
+
+function updateBatchButton() {
+    var checkedBoxes = document.querySelectorAll('.relation-checkbox:checked');
+    var batchBtn = document.getElementById('batchReturnBtn');
+    
+    batchBtn.disabled = checkedBoxes.length === 0;
+}
+
+document.querySelectorAll('.relation-checkbox').forEach(function(checkbox) {
+    checkbox.addEventListener('change', updateBatchButton);
+});
+
+function batchReturnToWarehouse() {
+    var checkedBoxes = document.querySelectorAll('.relation-checkbox:checked');
+    var relationIds = Array.from(checkedBoxes).map(function(cb) { return cb.value; });
+    
+    if (confirm('确定要将选中的 ' + relationIds.length + ' 个设备退库吗？')) {
+        $.post('/cmdb/api/batch_return_to_warehouse/', {
+            'relation_ids[]': relationIds,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('退库失败: ' + data.error);
+            }
+        });
+    }
+}
+
+function singleReturnToWarehouse(relationId) {
+    if (confirm('确定要将此设备退库吗？')) {
+        $.post('/cmdb/api/batch_return_to_warehouse/', {
+            'relation_ids[]': [relationId],
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('退库失败: ' + data.error);
+            }
+        });
+    }
+}
+
+// 打开图片预览弹窗
+function openImagePreview(src) {
+    document.getElementById('previewImage').src = src;
+    new bootstrap.Modal(document.getElementById('imagePreviewModal')).show();
+}
+</script>
+
+<!-- 图片预览模态框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">图片预览</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body d-flex justify-content-center align-items-center">
+                <img id="previewImage" src="" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

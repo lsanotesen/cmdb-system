@@ -516,7 +516,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8"></script>
+{% load static %}
+<script src="{% static 'external/chart.umd.min.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // 资产状态分布饼图

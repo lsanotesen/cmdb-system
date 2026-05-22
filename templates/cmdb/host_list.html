@@ -53,8 +53,8 @@
             </div>
         </form>
 
-        <div class="table-responsive">
-            <table>
+        <div class="table-container">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>主机名</th>
@@ -100,10 +100,10 @@
                         <td>{{ host.os|default:'-' }}</td>
                         <td><code>{{ host.sn|default:'-' }}</code></td>
                         <td><code>{{ host.bm_ip|default:'-' }}</code></td>
-                        <td class="actions">
-                            <a href="{% url 'host_detail' host.id %}" class="btn btn-sm">详情</a>
-                            <a href="{% url 'host_edit' host.id %}" class="btn btn-sm">编辑</a>
-                            <a href="{% url 'host_delete' host.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除主机 {{ host.hostname }}?')">删除</a>
+                        <td>
+                            <button class="btn btn-sm btn-edit" data-url="{% url 'host_detail' host.id %}" onclick="location.href=this.dataset.url">详情</button>
+                            <button class="btn btn-sm btn-edit" data-url="{% url 'host_edit' host.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                            <button class="btn btn-sm btn-delete" data-url="{% url 'host_delete' host.id %}" data-name="{{ host.hostname|escapejs }}" onclick="confirmDelete(this.dataset.url, this.dataset.name)">删除</button>
                         </td>
                     </tr>
                     {% empty %}

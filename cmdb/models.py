@@ -62,6 +62,7 @@ class Host(models.Model):
     asset_type = models.CharField('设备类型', choices=ASSET_TYPE, max_length=30, null=True, blank=True)
     ip = models.GenericIPAddressField('IP地址', max_length=15)
     contact_person = models.CharField('联系人/责任人', max_length=50, blank=True)
+    brand = models.CharField('品牌', max_length=100, blank=True)
     device_model = models.CharField('设备品牌型号', max_length=100, blank=True)
     cpu_model = models.CharField('CPU型号', max_length=200, blank=True)
     cpu_num = models.CharField('CPU数量', max_length=100, blank=True)
@@ -82,6 +83,16 @@ class Host(models.Model):
     last_collect_time = models.DateTimeField('上次采集时间', null=True, blank=True)
     is_auto_update = models.BooleanField('自动更新', default=False)
     other_ip = models.CharField('其它IP', max_length=100, blank=True, default='')
+    images = models.TextField('图片路径JSON', blank=True)
+    
+    def get_images_list(self):
+        """获取图片路径列表"""
+        if self.images:
+            try:
+                return json.loads(self.images)
+            except:
+                return []
+        return []
 
     def __str__(self):
         return self.hostname
@@ -394,6 +405,70 @@ class SparePart(models.Model):
                 return []
 
 
+class OfficePart(models.Model):
+    """办公机配件模型 - 办公电脑拆机件/备用配件池"""
+    
+    CATEGORY_CHOICES = [
+        ('cpu', 'CPU'),
+        ('motherboard', '主板'),
+        ('gpu', '显卡'),
+        ('memory', '内存'),
+        ('hdd', '机械硬盘'),
+        ('ssd', '固态硬盘'),
+        ('power', '电源'),
+        ('chassis', '机箱'),
+        ('monitor', '显示器'),
+        ('keyboard', '键盘'),
+        ('mouse', '鼠标'),
+        ('webcam', '摄像头'),
+        ('headset', '耳机/麦克风'),
+        ('network_card', '网卡'),
+        ('other', '其他'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('new', '全新'),
+        ('used', '拆机良品'),
+        ('in_stock', '闲置库存'),
+        ('installed', '使用中'),
+        ('pending', '待检测'),
+        ('faulty', '故障'),
+        ('retired', '待报废'),
+    ]
+    
+    name = models.CharField('配件名称', max_length=100)
+    category = models.CharField('配件分类', max_length=20, choices=CATEGORY_CHOICES, default='other')
+    brand = models.CharField('品牌', max_length=100, blank=True)
+    model = models.CharField('型号', max_length=100, blank=True)
+    serial_number = models.CharField('SN', max_length=100, blank=True, unique=True, null=True)
+    source_computer = models.CharField('来源办公电脑', max_length=200, blank=True, help_text='如: PC-2024-001')
+    status = models.CharField('当前状态', max_length=20, choices=STATUS_CHOICES, default='in_stock')
+    dismantle_date = models.DateField('拆机时间', blank=True, null=True)
+    location = models.CharField('存放位置', max_length=200, blank=True)
+    purchase_date = models.DateField('购买日期', blank=True, null=True)
+    remark = models.TextField('备注', blank=True)
+    images = models.TextField('图片路径JSON', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+    
+    def __str__(self):
+        return f'{self.name} - {self.get_status_display()}'
+    
+    def get_images_list(self):
+        """获取图片路径列表"""
+        if self.images:
+            try:
+                return json.loads(self.images)
+            except:
+                return []
+        return []
+    
+    class Meta:
+        verbose_name = '办公机配件'
+        verbose_name_plural = '办公机配件管理'
+        ordering = ['-created_at']
+
+
 class AssetRelation(models.Model):
     """资产关系模型 - 主资产与子资产的关系"""
     parent_asset = models.ForeignKey('Host', verbose_name='主资产（服务器）', on_delete=models.CASCADE, related_name='child_relations')
@@ -401,6 +476,8 @@ class AssetRelation(models.Model):
     slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
     is_removable = models.BooleanField('是否可拆卸', default=True)
     is_active = models.BooleanField('是否有效', default=True)
+    is_returned = models.BooleanField('是否已退库', default=False)
+    returned_at = models.DateTimeField('退库时间', null=True, blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
@@ -421,17 +498,26 @@ class InstallHistory(models.Model):
         ('replacement', '更换'),
         ('expansion', '扩容'),
         ('maintenance', '维护'),
+        ('direct_install', '直换'),
     ]
-    asset_relation = models.ForeignKey('AssetRelation', verbose_name='资产关系', on_delete=models.CASCADE, related_name='install_histories')
+    SOURCE_TYPES = [
+        ('spare', '备件库'),
+        ('direct_purchase', '直接采购'),
+    ]
+    asset_relation = models.ForeignKey('AssetRelation', verbose_name='资产关系', on_delete=models.CASCADE, related_name='install_histories', null=True, blank=True)
+    parent_asset = models.ForeignKey('Host', verbose_name='主资产', on_delete=models.CASCADE, related_name='install_histories_as_parent', null=True, blank=True)
+    child_asset = models.ForeignKey('Host', verbose_name='子资产', on_delete=models.CASCADE, related_name='install_histories_as_child', null=True, blank=True)
     install_time = models.DateTimeField('安装时间')
     uninstall_time = models.DateTimeField('拆卸时间', blank=True, null=True)
     operator = models.ForeignKey(User, verbose_name='操作人', on_delete=models.SET_NULL, null=True, blank=True)
     operation_type = models.CharField('操作类型', max_length=20, choices=OPERATION_TYPES)
+    source_type = models.CharField('来源类型', max_length=20, choices=SOURCE_TYPES, default='direct_purchase')
+    purchase_order_no = models.CharField('采购单号', max_length=100, blank=True, null=True)
     remark = models.TextField('备注', blank=True)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
 
     def __str__(self):
-        return f'{self.operation_type} - {self.asset_relation}'
+        return f'{self.operation_type} - {self.parent_asset} -> {self.child_asset}'
 
     class Meta:
         verbose_name = '安装历史'
@@ -500,6 +586,7 @@ class UserProfile(models.Model):
     permissions = models.TextField('个人权限JSON', blank=True)
     phone = models.CharField('电话', max_length=20, blank=True)
     department = models.CharField('部门', max_length=100, blank=True)
+    is_admin = models.BooleanField('是否为管理员', default=False)
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 

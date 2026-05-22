@@ -63,8 +63,19 @@
             </div>
         </form>
 
-        <div class="table-responsive">
-            <table>
+        <!-- 统计信息 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 14px; color: #666;">
+                {% if has_filter %}
+                    搜索结果：<span style="font-weight: 600; color: #1a1a1a;">{{ filtered_count }}</span> 条（共 {{ total_count }} 条）
+                {% else %}
+                    共 <span style="font-weight: 600; color: #1a1a1a;">{{ total_count }}</span> 条静态资产
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="select-all" onclick="selectAll()"></th>
@@ -103,9 +114,9 @@
                         <td>{{ asset.power_rating|default:'-' }}</td>
                         <td>{{ asset.memo|default:'-'|truncatewords:3 }}</td>
                         <td>{{ asset.status|default:'-' }}</td>
-                        <td class="actions">
-                            <a href="{% url 'static_asset_edit' asset.id %}" class="btn btn-sm">编辑</a>
-                            <a href="{% url 'static_asset_delete' asset.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除静态资产 {{ asset.asset_no }}?')">删除</a>
+                        <td>
+                            <button class="btn btn-sm btn-edit" data-url="{% url 'static_asset_edit' asset.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                            <button class="btn btn-sm btn-delete" data-url="{% url 'static_asset_delete' asset.id %}" data-asset-no="{{ asset.asset_no|escapejs }}" onclick="confirmDelete(this.dataset.url, this.dataset.assetNo)">删除</button>
                         </td>
                     </tr>
                     {% empty %}
@@ -136,6 +147,13 @@
 </div>
 
 <script>
+// 删除确认
+function confirmDelete(url, assetNo) {
+    if (confirm('确定删除静态资产 ' + assetNo + '?')) {
+        location.href = url;
+    }
+}
+
 // 全选/取消全选
 function selectAll() {
     const selectAllCheckbox = document.getElementById('select-all');

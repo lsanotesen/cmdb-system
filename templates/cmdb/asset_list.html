@@ -81,15 +81,26 @@
             </div>
         </form>
 
-        <div class="table-responsive">
-            <table>
+        <!-- 统计信息 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 14px; color: #666;">
+                {% if has_filter %}
+                    搜索结果：<span style="font-weight: 600; color: #1a1a1a;">{{ filtered_count }}</span> 条（共 {{ total_count }} 条）
+                {% else %}
+                    共 <span style="font-weight: 600; color: #1a1a1a;">{{ total_count }}</span> 条动态资产
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th><input type="checkbox" id="select-all" onclick="selectAll()"></th>
+                        <th>序号</th>
                         <th>主机名</th>
                         <th>资产编号</th>
                         <th>机柜位置</th>
-                        <th>部门</th>
                         <th>设备类型</th>
                         <th>IP地址</th>
                         <th>责任人</th>
@@ -105,8 +116,6 @@
                         <th>带外IP</th>
                         <th>上架时间</th>
                         <th>设备状态</th>
-                        <th>所属机房</th>
-                        <th>备注</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -114,10 +123,10 @@
                     {% for host in hosts %}
                     <tr>
                         <td><input type="checkbox" class="host-checkbox" value="{{ host.id }}"></td>
+                        <td>{{ forloop.counter }}</td>
                         <td><strong>{{ host.hostname }}</strong></td>
                         <td>{{ host.asset_no|default:'-' }}</td>
                         <td>{{ host.cabinet_position|default:'-' }}</td>
-                        <td>{{ host.department|default:'-' }}</td>
                         <td>
                             {% if host.asset_type == '1' %}<span class="badge badge-info">物理机</span>
                             {% elif host.asset_type == '2' %}<span class="badge badge-default">虚拟机</span>
@@ -146,21 +155,19 @@
                             {% elif host.status == '4' %}<span class="badge badge-default">其他</span>
                             {% else %}-{% endif %}
                         </td>
-                        <td>{{ host.idc.name|default:'-' }}</td>
-                        <td>{{ host.memo|default:'-'|truncatewords:3 }}</td>
-                        <td class="actions">
-                            <a href="{% url 'asset_detail' host.id %}" class="btn btn-sm">详情</a>
+                        <td>
+                            <button class="btn btn-sm btn-detail" data-url="{% url 'asset_detail' host.id %}" onclick="location.href=this.dataset.url">详情</button>
                             {% if user|has_permission:'asset_edit' %}
-                            <a href="{% url 'asset_edit' host.id %}" class="btn btn-sm">编辑</a>
+                            <button class="btn btn-sm btn-edit" data-url="{% url 'asset_edit' host.id %}" onclick="location.href=this.dataset.url">编辑</button>
                             {% endif %}
                             {% if user|has_permission:'asset_delete' %}
-                            <a href="{% url 'asset_delete' host.id %}" class="btn btn-sm btn-danger" onclick="return confirm('确定删除资产 {{ host.hostname }}?')">删除</a>
+                            <button class="btn btn-sm btn-delete" data-url="{% url 'asset_delete' host.id %}" data-name="{{ host.hostname|escapejs }}" onclick="confirmDelete(this.dataset.url, this.dataset.name)">删除</button>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="24" class="text-center">暂无资产数据，请 <a href="{% url 'asset_add' %}">添加资产</a> 或 <a href="{% url 'asset_import' %}">导入Excel</a></td>
+                        <td colspan="21" class="text-center">暂无资产数据，请 <a href="{% url 'asset_add' %}">添加资产</a> 或 <a href="{% url 'asset_import' %}">导入Excel</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -186,6 +193,13 @@
 </div>
 
 <script>
+// 删除确认
+function confirmDelete(url, hostname) {
+    if (confirm('确定删除资产 ' + hostname + '?')) {
+        location.href = url;
+    }
+}
+
 // 全选/取消全选
 function selectAll() {
     const selectAllCheckbox = document.getElementById('select-all');

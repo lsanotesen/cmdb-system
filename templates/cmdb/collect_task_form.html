@@ -17,7 +17,7 @@
             {% endfor %}
         {% endif %}
 
-        <form method="post" style="max-width: 900px;">
+        <form method="post" style="max-width: 900px;" action="{% if action == 'add' %}{% url 'collect_task_add' %}{% else %}{% url 'collect_task_edit' task.id %}{% endif %}">
             {% csrf_token %}
 
             <div class="form-row">

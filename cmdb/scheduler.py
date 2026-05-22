@@ -2,8 +2,15 @@ import os
 import sys
 import json
 import gzip
-from apscheduler import Scheduler
-from apscheduler.triggers.cron import CronTrigger
+try:
+    from apscheduler import Scheduler
+    from apscheduler.triggers.cron import CronTrigger
+    USE_OLD_API = True
+except ImportError:
+    # 兼容新版本 apscheduler
+    from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
+    from apscheduler.triggers.cron import CronTrigger
+    USE_OLD_API = False
 import subprocess
 from datetime import datetime
 
@@ -138,7 +145,10 @@ def update_scheduler_job():
 
     if schedule_id:
         try:
-            scheduler.remove_schedule(schedule_id)
+            if USE_OLD_API:
+                scheduler.remove_schedule(schedule_id)
+            else:
+                scheduler.remove_job(schedule_id)
             schedule_id = None
         except Exception as e:
             print(f"移除旧任务失败: {str(e)}")
@@ -148,7 +158,10 @@ def update_scheduler_job():
         cron_expr = config.get('auto_backup_cron', '0 2 * * *')
         try:
             trigger = CronTrigger.from_crontab(cron_expr)
-            schedule_id = scheduler.add_schedule(create_database_backup_task, trigger)
+            if USE_OLD_API:
+                schedule_id = scheduler.add_schedule(create_database_backup_task, trigger)
+            else:
+                schedule_id = scheduler.add_job(create_database_backup_task, trigger)
             print(f"定时任务添加成功: {schedule_id}")
         except Exception as e:
             print(f"添加定时任务失败: {str(e)}")
@@ -162,7 +175,10 @@ def start_scheduler():
 
     scheduler = Scheduler()
     update_scheduler_job()
-    scheduler.start_in_background()
+    if USE_OLD_API:
+        scheduler.start_in_background()
+    else:
+        scheduler.start()
 
 def stop_scheduler():
     """停止任务调度器"""

@@ -1,24 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="panel">
-    <div class="panel-header">
-        <h2>机柜列表</h2>
-    </div>
-    <div class="panel-body">
-        <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
-            <a href="{% url 'cabinet_add' %}" class="btn btn-success">+ 添加机柜</a>
-            <form method="get" style="display: flex; gap: 10px;">
-                <select name="idc_id" class="form-control" style="width: auto;">
-                    <option value="">全部机房</option>
-                    {% for idc in idc_list %}
-                    <option value="{{ idc.id }}">{{ idc.name }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn">筛选</button>
-            </form>
+<div class="card">
+    <div class="card-header">
+        <h2>🗃️ 机柜管理</h2>
+        <div class="btn-group">
+            <a href="{% url 'cabinet_add' %}" class="btn btn-success">➕ 添加机柜</a>
         </div>
-        <table>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="" style="display: flex; gap: 12px; margin-bottom: 16px;">
+            <select name="idc_id" class="form-control" style="width: 200px;">
+                <option value="">全部机房</option>
+                {% for idc in idc_list %}
+                <option value="{{ idc.id }}" {% if selected_idc_id == idc.id|stringformat:"s" %}selected{% endif %}>{{ idc.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn">筛选</button>
+            {% if selected_idc_id %}
+            <a href="{% url 'cabinet_list' %}" class="btn btn-secondary">重置</a>
+            {% endif %}
+        </form>
+        <div class="table-container">
+        <table class="data-table">
             <thead>
                 <tr>
                     <th>机柜名称</th>
@@ -33,9 +37,9 @@
                     <td>{{ cabinet.name }}</td>
                     <td>{{ cabinet.idc.name|default:'-' }}</td>
                     <td>{{ cabinet.desc|default:'-' }}</td>
-                    <td class="actions">
-                        <a href="{% url 'cabinet_edit' cabinet.id %}" class="btn">编辑</a>
-                        <a href="{% url 'cabinet_delete' cabinet.id %}" class="btn btn-danger" onclick="return confirm('确定删除?')">删除</a>
+                    <td>
+                        <button class="btn btn-sm btn-edit" data-url="{% url 'cabinet_edit' cabinet.id %}" onclick="location.href=this.dataset.url">编辑</button>
+                        <button class="btn btn-sm btn-delete" data-url="{% url 'cabinet_delete' cabinet.id %}" onclick="confirmDelete(this.dataset.url)">删除</button>
                     </td>
                 </tr>
                 {% empty %}
@@ -45,6 +49,17 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(url) {
+    if (confirm('确定删除?')) {
+        location.href = url;
+    }
+}
+</script>
 {% endblock %}

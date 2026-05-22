@@ -108,8 +108,18 @@ urlpatterns = [
     path('backup/config/', views.get_backup_config_api, name='get_backup_config'),
     path('backup/config/save/', views.save_backup_config_api, name='save_backup_config'),
 
+    # 办公机配件管理
+    path('office_parts/', views.office_parts_list, name='office_parts_list'),
+    path('office_parts/add/', views.office_part_add, name='office_part_add'),
+    path('office_parts/<int:part_id>/edit/', views.office_part_edit, name='office_part_edit'),
+    path('office_parts/<int:part_id>/delete/', views.office_part_delete, name='office_part_delete'),
+    path('office_parts/batch_delete/', views.office_part_batch_delete, name='office_part_batch_delete'),
+    path('office_parts/update_status/', views.office_part_update_status, name='office_part_update_status'),
+    
     # 备件管理
     path('spareparts/', views.spareparts_list, name='spareparts_list'),
+    path('spareparts/server/', views.server_spareparts_list, name='server_spareparts_list'),
+    path('spareparts/desktop/', views.desktop_spareparts_list, name='desktop_spareparts_list'),
     path('spareparts/add/', views.spareparts_add, name='spareparts_add'),
     path('spareparts/<int:sparepart_id>/edit/', views.spareparts_edit, name='spareparts_edit'),
     path('spareparts/<int:sparepart_id>/delete/', views.spareparts_delete, name='spareparts_delete'),
@@ -123,6 +133,8 @@ urlpatterns = [
     # 资产关系管理
     path('asset_relations/', views.asset_relation_list, name='asset_relation_list'),
     path('asset_relations/<int:relation_id>/', views.asset_relation_detail, name='asset_relation_detail'),
+    path('asset_relations/uninstalled/', views.uninstalled_hardware_list, name='uninstalled_hardware_list'),
+    path('asset_relations/returned/', views.returned_devices_list, name='returned_devices_list'),
     
     # 生命周期管理
     path('lifecycle/', views.lifecycle_event_list, name='lifecycle_event_list'),
@@ -133,9 +145,21 @@ urlpatterns = [
     # API接口
     path('api/host_children/<int:host_id>/', views.api_get_host_children, name='api_get_host_children'),
     path('api/install_component/', views.api_install_component, name='api_install_component'),
+    path('api/direct_install_component/', views.api_direct_install_component, name='api_direct_install_component'),
     path('api/uninstall_component/', views.api_uninstall_component, name='api_uninstall_component'),
     path('api/install_history/<int:relation_id>/', views.api_get_install_history, name='api_get_install_history'),
     path('api/install_sparepart/', views.api_install_sparepart, name='api_install_sparepart'),
+    path('api/get_relation_detail/', views.api_get_relation_detail, name='api_get_relation_detail'),
+    path('api/edit_relation/', views.api_edit_relation, name='api_edit_relation'),
+    path('api/remove_relation/', views.api_remove_relation, name='api_remove_relation'),
+    path('api/add_to_spareparts/', views.api_add_to_spareparts, name='api_add_to_spareparts'),
+    path('api/batch_return_to_warehouse/', views.api_batch_return_to_warehouse, name='api_batch_return_to_warehouse'),
+    path('api/cancel_return/', views.api_cancel_return, name='api_cancel_return'),
+    path('api/delete_returned_record/', views.api_delete_returned_record, name='api_delete_returned_record'),
+    path('api/get_relation_history/', views.api_get_relation_history, name='api_get_relation_history'),
+    path('api/get_asset_lifecycle/', views.api_get_asset_lifecycle, name='api_get_asset_lifecycle'),
     path('api/lifecycle_events/<int:host_id>/', views.api_get_lifecycle_events, name='api_get_lifecycle_events'),
     path('api/add_lifecycle_event/', views.api_add_lifecycle_event, name='api_add_lifecycle_event'),
+    path('api/delete_lifecycle_event/<int:event_id>/', views.api_delete_lifecycle_event, name='api_delete_lifecycle_event'),
+    path('api/batch_delete_lifecycle_events/', views.api_batch_delete_lifecycle_events, name='api_batch_delete_lifecycle_events'),
 ]
