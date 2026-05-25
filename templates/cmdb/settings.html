@@ -77,13 +77,13 @@
 <script>
 function confirmDisable(userId) {
     if (confirm('确定要禁用该用户吗？')) {
-        location.href = '/cmdb/users/' + userId + '/disable/';
+        location.href = '/cmdb/settings/user/' + userId + '/disable/';
     }
 }
 
 function confirmDelete(userId) {
     if (confirm('确定要删除该用户吗？此操作不可撤销！')) {
-        location.href = '/cmdb/users/' + userId + '/delete/';
+        location.href = '/cmdb/settings/user/' + userId + '/delete/';
     }
 }
 </script>
