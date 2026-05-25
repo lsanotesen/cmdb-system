@@ -147,7 +147,8 @@ def cleanup_old_backups(backup_dir, keep_count, exclude_filename):
 
 def get_backup_config():
     """获取备份配置"""
-    config_file = '/data01/db_backup/backup_config.json'
+    # 配置文件保存在项目目录下，不依赖备份目录
+    config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backup_config.json')
 
     default_config = {
         'db_host': 'db',

@@ -3068,7 +3068,8 @@ import shutil
 
 def get_backup_config():
     """获取备份配置，从配置文件读取，默认值基于Django settings"""
-    config_file = '/data01/db_backup/backup_config.json'
+    # 配置文件保存在项目目录下，不依赖备份目录
+    config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backup_config.json')
     
     default_config = {
         'db_host': settings.DATABASES['default']['HOST'],
@@ -3101,7 +3102,8 @@ def get_backup_config():
 
 def save_backup_config(config):
     """保存备份配置到文件"""
-    config_file = '/data01/db_backup/backup_config.json'
+    # 配置文件保存在项目目录下，不依赖备份目录
+    config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backup_config.json')
     os.makedirs(os.path.dirname(config_file), exist_ok=True)
     
     try:
