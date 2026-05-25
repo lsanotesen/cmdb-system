@@ -284,30 +284,24 @@
                         </a>
                     </div>
                     {% endif %}
-                    {% if request.user|has_module_permission:'idc' %}
                     <div class="nav-item">
                         <a href="{% url 'idc_list' %}" {% if '/cmdb/idc' in request.path and 'add' not in request.path and 'edit' not in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-building"></i>
                             <span>机房管理</span>
                         </a>
                     </div>
-                    {% endif %}
-                    {% if request.user|has_module_permission:'cabinet' %}
                     <div class="nav-item">
                         <a href="{% url 'cabinet_list' %}" {% if '/cmdb/cabinet' in request.path and 'add' not in request.path and 'edit' not in request.path and 'layout' not in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-archive"></i>
                             <span>机柜管理</span>
                         </a>
                     </div>
-                    {% endif %}
-                    {% if request.user|has_module_permission:'group' %}
                     <div class="nav-item">
                         <a href="{% url 'group_list' %}" {% if '/cmdb/group' in request.path and 'add' not in request.path and 'edit' not in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-layer-group"></i>
                             <span>动态资产组</span>
                         </a>
                     </div>
-                    {% endif %}
                     <div class="nav-item">
                         <a href="{% url 'spareparts_list' %}" {% if '/cmdb/spareparts' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-wrench"></i>
@@ -347,33 +341,27 @@
                             <span>跳板机</span>
                         </a>
                     </div>
-                    {% if request.user|has_module_permission:'server' %}
                     <div class="nav-item">
                         <a href="{% url 'target_server_list' %}" {% if '/cmdb/server' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-lock"></i>
                             <span>目标服务器</span>
                         </a>
                     </div>
-                    {% endif %}
-                    {% if request.user|has_module_permission:'collect' %}
                     <div class="nav-item">
                         <a href="{% url 'collect_task_list' %}" {% if '/cmdb/collect' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-radio"></i>
                             <span>采集任务</span>
                         </a>
                     </div>
-                    {% endif %}
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">数据管理</div>
-                    {% if request.user|has_module_permission:'backup' %}
                     <div class="nav-item">
                         <a href="{% url 'backup_list' %}" {% if '/cmdb/backup' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-archive"></i>
                             <span>数据备份</span>
                         </a>
                     </div>
-                    {% endif %}
                 </div>
                 {% if user.is_superuser or user.userprofile.is_admin %}
                 <div class="nav-section">
