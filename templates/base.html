@@ -260,30 +260,24 @@
                 </div>
                 <div class="nav-section">
                     <div class="nav-section-title">资产管理</div>
-                    {% if request.user|has_module_permission:'asset' %}
                     <div class="nav-item">
                         <a href="{% url 'asset_list' %}" {% if '/cmdb/assets' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-desktop"></i>
                             <span>动态资产</span>
                         </a>
                     </div>
-                    {% endif %}
-                    {% if request.user|has_module_permission:'static_asset' %}
                     <div class="nav-item">
                         <a href="{% url 'static_asset_list' %}" {% if '/cmdb/static/assets' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-box"></i>
                             <span>静态资产</span>
                         </a>
                     </div>
-                    {% endif %}
-                    {% if request.user|has_module_permission:'cabinet' %}
                     <div class="nav-item">
                         <a href="{% url 'cabinet_layout' %}" {% if '/cmdb/cabinet/layout' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-th-large"></i>
                             <span>机柜布局图</span>
                         </a>
                     </div>
-                    {% endif %}
                     <div class="nav-item">
                         <a href="{% url 'idc_list' %}" {% if '/cmdb/idc' in request.path and 'add' not in request.path and 'edit' not in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-building"></i>
