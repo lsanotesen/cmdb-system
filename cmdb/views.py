@@ -601,6 +601,7 @@ def idc_add(request):
     try:
         if request.method == 'POST':
             # 处理表单提交
+            ids = request.POST.get('ids')
             name = request.POST.get('name')
             address = request.POST.get('address')
             tel = request.POST.get('phone', '') or ''
@@ -608,7 +609,7 @@ def idc_add(request):
             memo = request.POST.get('desc', '') or ''
             
             # 创建IDC
-            idc = Idc(name=name, address=address, tel=tel, contact=contact, memo=memo)
+            idc = Idc(ids=ids, name=name, address=address, tel=tel, contact=contact, memo=memo)
             idc.save()
 
             log_operation(request.user, 'add', f'IDC: {name}', f'添加IDC机房: {name}', request.META.get('REMOTE_ADDR'))
@@ -629,6 +630,7 @@ def idc_edit(request, idc_id):
         
         if request.method == 'POST':
             # 处理表单提交
+            ids = request.POST.get('ids')
             name = request.POST.get('name')
             address = request.POST.get('address')
             tel = request.POST.get('phone', '') or ''
@@ -636,6 +638,7 @@ def idc_edit(request, idc_id):
             memo = request.POST.get('desc', '') or ''
             
             # 更新IDC信息
+            idc.ids = ids
             idc.name = name
             idc.address = address
             idc.tel = tel
