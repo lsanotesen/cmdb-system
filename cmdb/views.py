@@ -1863,6 +1863,8 @@ def immediate_collect(request, task_id):
                                         logger.error(f"[CollectTask] 资产 {ip} 信息已更新")
                                     except Host.DoesNotExist:
                                         # 资产不存在，创建新资产
+                                        # 确定设备状态：采集成功为使用中，失败为其他
+                                        device_status = '1' if result['status'] == 'success' else '4'
                                         host = Host(
                                             ip=ip,
                                             hostname=hardware_info.hostname if task.update_hostname else f"host-{ip}",
@@ -1876,10 +1878,11 @@ def immediate_collect(request, task_id):
                                             sn=hardware_info.sn if task.update_sn else "",
                                             device_model=f"{hardware_info.vendor} {hardware_info.product}".strip() if task.update_device_info else "",
                                             bm_ip=hardware_info.bm_ip if task.update_device_info else "",
-                                            asset_type=hardware_info.asset_type if task.update_device_info else "服务器"
+                                            asset_type=hardware_info.asset_type if task.update_device_info else "服务器",
+                                            status=device_status
                                         )
                                         host.save()
-                                        logger.error(f"[CollectTask] 资产 {ip} 不存在，已创建新资产")
+                                        logger.error(f"[CollectTask] 资产 {ip} 不存在，已创建新资产，状态: {'使用中' if device_status == '1' else '其他'}")
                                     except Exception as e:
                                         logger.error(f"[CollectTask] 更新资产 {ip} 信息失败: {str(e)}")
 
