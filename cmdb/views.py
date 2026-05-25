@@ -3730,8 +3730,11 @@ def restore_media_backup_upload(request):
             return JsonResponse({'success': False, 'error': '请选择要上传的媒体备份文件'})
         
         media_file = request.FILES['media_file']
-        if not media_file.name.endswith('.tar.gz'):
-            return JsonResponse({'success': False, 'error': '只支持 .tar.gz 格式的备份文件'})
+        filename = media_file.name
+        
+        # 检查文件扩展名，支持多种情况
+        if not (filename.endswith('.tar.gz') or filename.endswith('.tgz')):
+            return JsonResponse({'success': False, 'error': f'只支持 .tar.gz 格式的备份文件（当前文件：{filename}）'})
         
         media_root = settings.MEDIA_ROOT
         backup_media_dir = None
