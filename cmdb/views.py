@@ -603,12 +603,12 @@ def idc_add(request):
             # 处理表单提交
             name = request.POST.get('name')
             address = request.POST.get('address')
-            phone = request.POST.get('phone')
+            tel = request.POST.get('phone', '') or ''
             contact = request.POST.get('contact', '') or ''
-            desc = request.POST.get('desc', '') or ''
+            memo = request.POST.get('desc', '') or ''
             
             # 创建IDC
-            idc = Idc(name=name, address=address, phone=phone, contact=contact, desc=desc)
+            idc = Idc(name=name, address=address, tel=tel, contact=contact, memo=memo)
             idc.save()
 
             log_operation(request.user, 'add', f'IDC: {name}', f'添加IDC机房: {name}', request.META.get('REMOTE_ADDR'))
@@ -631,16 +631,16 @@ def idc_edit(request, idc_id):
             # 处理表单提交
             name = request.POST.get('name')
             address = request.POST.get('address')
-            phone = request.POST.get('phone')
+            tel = request.POST.get('phone', '') or ''
             contact = request.POST.get('contact', '') or ''
-            desc = request.POST.get('desc', '') or ''
+            memo = request.POST.get('desc', '') or ''
             
             # 更新IDC信息
             idc.name = name
             idc.address = address
-            idc.phone = phone
+            idc.tel = tel
             idc.contact = contact
-            idc.desc = desc
+            idc.memo = memo
             idc.save()
             
             messages.success(request, f'IDC {name} 更新成功')
