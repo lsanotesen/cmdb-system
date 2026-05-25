@@ -98,7 +98,6 @@
                     <tr>
                         <th><input type="checkbox" id="select-all" onclick="selectAll()"></th>
                         <th>序号</th>
-                        <th>主机名</th>
                         <th>资产编号</th>
                         <th>机柜位置</th>
                         <th>设备类型</th>
@@ -124,7 +123,6 @@
                     <tr>
                         <td><input type="checkbox" class="host-checkbox" value="{{ host.id }}"></td>
                         <td>{{ forloop.counter }}</td>
-                        <td><strong>{{ host.hostname }}</strong></td>
                         <td>{{ host.asset_no|default:'-' }}</td>
                         <td>{{ host.cabinet_position|default:'-' }}</td>
                         <td>
@@ -167,7 +165,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="21" class="text-center">暂无资产数据，请 <a href="{% url 'asset_add' %}">添加资产</a> 或 <a href="{% url 'asset_import' %}">导入Excel</a></td>
+                        <td colspan="20" class="text-center">暂无资产数据，请 <a href="{% url 'asset_add' %}">添加资产</a> 或 <a href="{% url 'asset_import' %}">导入Excel</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
