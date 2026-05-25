@@ -3,68 +3,140 @@
 {% block title %}数据恢复{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 600px; margin: 0 auto;">
-    <div class="card" style="margin-top: 20px;">
-        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
-            <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🔄 数据库恢复</h2>
-            <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">通过上传SQL文件恢复数据库</p>
+<div class="container" style="max-width: 1200px; margin: 0 auto;">
+    <div class="restore-grid">
+        <!-- 数据库恢复卡片 -->
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🔄 数据库恢复</h2>
+                <p style="margin: 0; opacity: 0.9; font-size: 13px;">通过上传SQL文件恢复数据库</p>
+            </div>
+            
+            <div class="card-body" style="padding: 30px;">
+                {% if restore_status %}
+                <div style="padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; {% if restore_status.success %}background: #d4edda; color: #155724;{% else %}background: #f8d7da; color: #721c24;{% endif %}">
+                    <strong>{% if restore_status.success %}✓ 成功{% else %}✗ 失败{% endif %}</strong>: {{ restore_status.message }}
+                    {% if restore_status.success %}
+                    <br><br>
+                    <span style="font-size: 13px;">💡 提示：数据已成功恢复，请手动刷新页面或重新登录。</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px; color: #856404; font-size: 14px;">⚠️ 重要警告</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 13px; line-height: 1.6;">
+                        <li>恢复操作将<strong>覆盖当前所有数据</strong></li>
+                        <li>请确保已备份当前数据库</li>
+                        <li>恢复过程可能需要几分钟，请耐心等待</li>
+                        <li>只有超级管理员才能执行此操作</li>
+                    </ul>
+                </div>
+                
+                <form method="post" enctype="multipart/form-data" style="margin-bottom: 20px;">
+                    {% csrf_token %}
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #333;">选择SQL文件</label>
+                        <div id="dropArea" style="border: 2px dashed #ddd; border-radius: 8px; padding: 30px; text-align: center; transition: border-color 0.3s;">
+                            <input type="file" name="sql_file" accept=".sql,.sql.gz" style="display: none;" id="sqlFileInput">
+                            <label for="sqlFileInput" style="cursor: pointer; display: inline-block;">
+                                <div id="fileIcon" style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                                <div id="fileText" style="color: #666;">点击或拖拽文件到此处</div>
+                                <div id="fileName" style="color: #28a745; font-size: 14px; margin-top: 10px; font-weight: 500;"></div>
+                                <div style="color: #999; font-size: 12px; margin-top: 5px;">支持 .sql 或 .sql.gz 文件</div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="restoreBtn" style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: transform 0.2s; margin-bottom: 10px;" onclick="return confirmRestore()">
+                        🚀 开始恢复
+                    </button>
+                    
+                    <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px; background: #e7f3ff; border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">⏳</div>
+                        <div style="color: #007bff; font-weight: 500;">正在恢复数据...</div>
+                        <div style="color: #666; font-size: 13px; margin-top: 5px;">此过程可能需要几分钟，请耐心等待...</div>
+                    </div>
+                </form>
+                
+                <div style="text-align: center; color: #999; font-size: 13px;">
+                    <p>💡 提示：恢复后系统会自动重新加载页面</p>
+                </div>
+            </div>
         </div>
         
-        <div class="card-body" style="padding: 30px;">
-            {% if restore_status %}
-            <div style="padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; {% if restore_status.success %}background: #d4edda; color: #155724;{% else %}background: #f8d7da; color: #721c24;{% endif %}">
-                <strong>{% if restore_status.success %}✓ 成功{% else %}✗ 失败{% endif %}</strong>: {{ restore_status.message }}
-                {% if restore_status.success %}
-                <br><br>
-                <span style="font-size: 13px;">💡 提示：数据已成功恢复，请手动刷新页面或重新登录。</span>
-                {% endif %}
-            </div>
-            {% endif %}
-            
-            <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                <h4 style="margin: 0 0 10px; color: #856404; font-size: 14px;">⚠️ 重要警告</h4>
-                <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 13px; line-height: 1.6;">
-                    <li>恢复操作将<strong>覆盖当前所有数据</strong></li>
-                    <li>请确保已备份当前数据库</li>
-                    <li>恢复过程可能需要几分钟，请耐心等待</li>
-                    <li>只有超级管理员才能执行此操作</li>
-                </ul>
+        <!-- 媒体文件恢复卡片 -->
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <h2 style="margin: 0; font-size: 20px; font-weight: 600;">🖼️ 媒体文件恢复</h2>
+                <p style="margin: 0; opacity: 0.9; font-size: 13px;">通过上传.tar.gz文件恢复媒体文件（备件和办公机配件图片等）</p>
             </div>
             
-            <form method="post" enctype="multipart/form-data" style="margin-bottom: 20px;">
-                {% csrf_token %}
+            <div class="card-body" style="padding: 30px;">
+                <div id="mediaAlert" style="display: none; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px;"></div>
+                
+                <div style="background: #fff3cd; border: 1px solid #ffeeba; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px; color: #856404; font-size: 14px;">⚠️ 重要警告</h4>
+                    <ul style="margin: 0; padding-left: 20px; color: #856404; font-size: 13px; line-height: 1.6;">
+                        <li>恢复操作将<strong>覆盖当前所有媒体文件</strong></li>
+                        <li>系统会自动备份现有文件到 media/backup_xxx/ 目录</li>
+                        <li>请确保上传的是正确的 .tar.gz 备份文件</li>
+                        <li>只有超级管理员才能执行此操作</li>
+                    </ul>
+                </div>
                 
                 <div style="margin-bottom: 20px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #333;">选择SQL文件</label>
-                    <div id="dropArea" style="border: 2px dashed #ddd; border-radius: 8px; padding: 30px; text-align: center; transition: border-color 0.3s;">
-                        <input type="file" name="sql_file" accept=".sql,.sql.gz" style="display: none;" id="sqlFileInput">
-                        <label for="sqlFileInput" style="cursor: pointer; display: inline-block;">
-                            <div id="fileIcon" style="font-size: 48px; margin-bottom: 10px;">📁</div>
-                            <div id="fileText" style="color: #666;">点击或拖拽文件到此处</div>
-                            <div id="fileName" style="color: #28a745; font-size: 14px; margin-top: 10px; font-weight: 500;"></div>
-                            <div style="color: #999; font-size: 12px; margin-top: 5px;">支持 .sql 或 .sql.gz 文件</div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #333;">选择媒体备份文件</label>
+                    <div id="mediaDropArea" style="border: 2px dashed #ddd; border-radius: 8px; padding: 30px; text-align: center; transition: border-color 0.3s;">
+                        <input type="file" name="media_file" accept=".tar.gz" style="display: none;" id="mediaFileInput">
+                        <label for="mediaFileInput" style="cursor: pointer; display: inline-block;">
+                            <div id="mediaFileIcon" style="font-size: 48px; margin-bottom: 10px;">🖼️</div>
+                            <div id="mediaFileText" style="color: #666;">点击或拖拽文件到此处</div>
+                            <div id="mediaFileName" style="color: #28a745; font-size: 14px; margin-top: 10px; font-weight: 500;"></div>
+                            <div style="color: #999; font-size: 12px; margin-top: 5px;">支持 .tar.gz 文件（媒体备份）</div>
                         </label>
                     </div>
                 </div>
                 
-                <button type="submit" id="restoreBtn" style="width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: transform 0.2s; margin-bottom: 10px;" onclick="return confirmRestore()">
-                    🚀 开始恢复
-                </button>
+                <button id="restoreMediaBtn" style="width: 100%; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; transition: transform 0.2s; margin-bottom: 10px;" onclick="restoreMediaBackup()">
+                        🚀 恢复媒体文件
+                    </button>
+                    
+                    <div id="mediaLoadingIndicator" style="display: none; text-align: center; padding: 20px; background: #fdf2f8; border-radius: 8px;">
+                        <div style="font-size: 32px; margin-bottom: 10px;">⏳</div>
+                        <div style="color: #d6336c; font-weight: 500;">正在恢复媒体文件...</div>
+                        <div style="color: #666; font-size: 13px; margin-top: 5px;">请耐心等待...</div>
+                    </div>
                 
-                <!-- 加载状态 -->
-                <div id="loadingIndicator" style="display: none; text-align: center; padding: 20px; background: #e7f3ff; border-radius: 8px;">
-                    <div style="font-size: 32px; margin-bottom: 10px;">⏳</div>
-                    <div style="color: #007bff; font-weight: 500;">正在恢复数据...</div>
-                    <div style="color: #666; font-size: 13px; margin-top: 5px;">此过程可能需要几分钟，请耐心等待...</div>
+                <div style="text-align: center; color: #999; font-size: 13px;">
+                    <p>💡 提示：恢复后当前媒体文件会自动备份到 media/backup_时间戳/ 目录</p>
                 </div>
-            </form>
-            
-            <div style="text-align: center; color: #999; font-size: 13px;">
-                <p>💡 提示：恢复后系统会自动重新加载页面</p>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+.restore-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.card {
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    .restore-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 
 <script>
 function confirmRestore() {
@@ -84,7 +156,6 @@ function confirmRestore() {
     );
 }
 
-// 文件选择显示
 document.getElementById('sqlFileInput').addEventListener('change', function(e) {
     var file = e.target.files[0];
     if (file) {
@@ -96,35 +167,118 @@ document.getElementById('sqlFileInput').addEventListener('change', function(e) {
     }
 });
 
-// 拖拽上传支持
+document.getElementById('mediaFileInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (file) {
+        document.getElementById('mediaFileIcon').textContent = '✅';
+        document.getElementById('mediaFileText').textContent = '文件已选择';
+        document.getElementById('mediaFileName').textContent = file.name;
+        document.getElementById('mediaDropArea').style.borderColor = '#28a745';
+        document.getElementById('mediaDropArea').style.borderStyle = 'solid';
+    }
+});
+
 document.addEventListener('dragover', function(e) {
     e.preventDefault();
     document.getElementById('dropArea').style.borderColor = '#667eea';
+    document.getElementById('mediaDropArea').style.borderColor = '#f093fb';
 });
 
 document.addEventListener('dragleave', function(e) {
     e.preventDefault();
     document.getElementById('dropArea').style.borderColor = '#ddd';
     document.getElementById('dropArea').style.borderStyle = 'dashed';
+    document.getElementById('mediaDropArea').style.borderColor = '#ddd';
+    document.getElementById('mediaDropArea').style.borderStyle = 'dashed';
 });
 
 document.addEventListener('drop', function(e) {
     e.preventDefault();
     document.getElementById('dropArea').style.borderColor = '#ddd';
     document.getElementById('dropArea').style.borderStyle = 'dashed';
+    document.getElementById('mediaDropArea').style.borderColor = '#ddd';
+    document.getElementById('mediaDropArea').style.borderStyle = 'dashed';
+    
     var files = e.dataTransfer.files;
     if (files.length > 0) {
-        document.getElementById('sqlFileInput').files = files;
-        // 触发change事件
-        var event = new Event('change');
-        document.getElementById('sqlFileInput').dispatchEvent(event);
+        var file = files[0];
+        if (file.name.endsWith('.sql') || file.name.endsWith('.sql.gz')) {
+            document.getElementById('sqlFileInput').files = files;
+            var event = new Event('change');
+            document.getElementById('sqlFileInput').dispatchEvent(event);
+        } else if (file.name.endsWith('.tar.gz')) {
+            document.getElementById('mediaFileInput').files = files;
+            var event = new Event('change');
+            document.getElementById('mediaFileInput').dispatchEvent(event);
+        }
     }
 });
 
-// 表单提交时显示加载状态
 document.querySelector('form').addEventListener('submit', function(e) {
     document.getElementById('restoreBtn').style.display = 'none';
     document.getElementById('loadingIndicator').style.display = 'block';
 });
+
+async function restoreMediaBackup() {
+    var fileInput = document.getElementById('mediaFileInput');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('请先选择要恢复的媒体备份文件！');
+        return;
+    }
+    
+    if (!confirm('⚠️ 警告：此操作将覆盖当前所有媒体文件！\n\n系统会自动备份现有文件到 media/backup_xxx/ 目录。\n\n确定要继续恢复吗？')) {
+        return;
+    }
+    
+    document.getElementById('restoreMediaBtn').style.display = 'none';
+    document.getElementById('mediaLoadingIndicator').style.display = 'block';
+    
+    var file = fileInput.files[0];
+    var formData = new FormData();
+    formData.append('media_file', file);
+    
+    try {
+        var response = await fetch('/cmdb/backup/restore_media/upload/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        });
+        
+        var result = await response.json();
+        
+        var alertDiv = document.getElementById('mediaAlert');
+        if (result.success) {
+            alertDiv.style.background = '#d4edda';
+            alertDiv.style.color = '#155724';
+            alertDiv.innerHTML = '<strong>✓ 成功</strong>: ' + result.message;
+        } else {
+            alertDiv.style.background = '#f8d7da';
+            alertDiv.style.color = '#721c24';
+            alertDiv.innerHTML = '<strong>✗ 失败</strong>: ' + result.error;
+        }
+        alertDiv.style.display = 'block';
+        
+        setTimeout(function() {
+            alertDiv.style.display = 'none';
+        }, 5000);
+    } catch (error) {
+        var alertDiv = document.getElementById('mediaAlert');
+        alertDiv.style.background = '#f8d7da';
+        alertDiv.style.color = '#721c24';
+        alertDiv.innerHTML = '<strong>✗ 失败</strong>: ' + error.message;
+        alertDiv.style.display = 'block';
+    } finally {
+        document.getElementById('restoreMediaBtn').style.display = 'block';
+        document.getElementById('mediaLoadingIndicator').style.display = 'none';
+    }
+}
+
+function getCookie(name) {
+    var value = '; ' + document.cookie;
+    var parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
 </script>
 {% endblock %}

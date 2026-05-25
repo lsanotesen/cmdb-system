@@ -132,6 +132,18 @@
                         <input type="time" id="autoBackupTime" value="02:00">
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>备份媒体文件</label>
+                        <div class="switch-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="backupMediaEnabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <label id="backupMediaStatus">已启用</label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -224,6 +236,8 @@ async function loadBackupConfig() {
             document.getElementById('autoBackupEnabled').checked = config.auto_backup_enabled || false;
             document.getElementById('autoBackupStatus').textContent = config.auto_backup_enabled ? '已启用' : '已禁用';
             document.getElementById('autoBackupTime').value = config.auto_backup_time || '02:00';
+            document.getElementById('backupMediaEnabled').checked = config.backup_media_enabled !== false;
+            document.getElementById('backupMediaStatus').textContent = config.backup_media_enabled !== false ? '已启用' : '已禁用';
         }
     } catch (error) {
         console.error('加载备份配置失败:', error);
@@ -248,7 +262,8 @@ async function saveBackupConfig() {
                 backup_dir: document.getElementById('backupDir').value,
                 keep_count: parseInt(document.getElementById('keepCount').value),
                 auto_backup_enabled: document.getElementById('autoBackupEnabled').checked,
-                auto_backup_time: document.getElementById('autoBackupTime').value
+                auto_backup_time: document.getElementById('autoBackupTime').value,
+                backup_media_enabled: document.getElementById('backupMediaEnabled').checked
             })
         });
         
@@ -269,7 +284,7 @@ async function createBackup() {
     const btn = document.getElementById('backupBtn');
     btn.disabled = true;
     btn.textContent = '🔄 备份中...';
-    showLoading('正在执行数据库备份...');
+    showLoading('正在执行备份...');
     
     try {
         const response = await fetch('/cmdb/backup/create/', {
@@ -282,7 +297,14 @@ async function createBackup() {
         const result = await response.json();
         
         if (result.success) {
-            showAlert('✅ 备份创建成功！文件名: ' + result.filename, 'success');
+            let message = '✅ 备份创建成功！<br>数据库: ' + result.filename;
+            if (result.media_filename) {
+                message += '<br>媒体文件: ' + result.media_filename;
+            }
+            if (result.media_error) {
+                message += '<br>⚠️ 媒体备份失败: ' + result.media_error;
+            }
+            showAlert(message, 'success');
             refreshBackups();
         } else {
             showAlert('❌ 备份失败: ' + result.error, 'danger');
@@ -306,17 +328,25 @@ async function refreshBackups() {
         if (data.files && data.files.length > 0) {
             tbody.innerHTML = '';
             data.files.forEach(file => {
+                const isMediaBackup = file.filename.includes('media_backup');
+                const backupTypeLabel = isMediaBackup ? '媒体备份' : (file.backup_type === 'manual' ? '手动' : '自动');
+                const badgeClass = isMediaBackup ? 'badge-warning' : (file.backup_type === 'manual' ? 'badge-info' : 'badge-success');
+                
                 const row = document.createElement('tr');
+                let actions = `<a href="/cmdb/backup/download/${encodeURIComponent(file.filename)}" class="btn btn-sm" title="下载">📥</a>`;
+                if (isMediaBackup) {
+                    actions += `<button onclick="restoreMediaBackup('${file.filename}')" class="btn btn-sm btn-secondary" title="恢复媒体文件">🔄</button>`;
+                } else {
+                    actions += `<button onclick="restoreBackup('${file.filename}')" class="btn btn-sm btn-secondary" title="恢复数据库">🔄</button>`;
+                }
+                actions += `<button onclick="deleteBackup('${file.filename}')" class="btn btn-sm btn-danger" title="删除">🗑️</button>`;
+                
                 row.innerHTML = `
                     <td>${file.filename}</td>
                     <td>${file.created_at}</td>
                     <td>${file.size}</td>
-                    <td><span class="badge ${file.backup_type === 'manual' ? 'badge-info' : 'badge-success'}">${file.backup_type === 'manual' ? '手动' : '自动'}</span></td>
-                    <td>
-                        <a href="/cmdb/backup/download/${encodeURIComponent(file.filename)}" class="btn btn-sm" title="下载">📥</a>
-                        <button onclick="restoreBackup('${file.filename}')" class="btn btn-sm btn-secondary" title="恢复">🔄</button>
-                        <button onclick="deleteBackup('${file.filename}')" class="btn btn-sm btn-danger" title="删除">🗑️</button>
-                    </td>
+                    <td><span class="badge ${badgeClass}">${backupTypeLabel}</span></td>
+                    <td>${actions}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -401,6 +431,35 @@ async function deleteBackup(filename) {
         }
     } catch (error) {
         showAlert('❌ 删除失败: ' + error.message, 'danger');
+    }
+}
+
+async function restoreMediaBackup(filename) {
+    if (!confirm(`⚠️ 警告：此操作将从备份文件 "${filename}" 恢复媒体文件！\n\n恢复过程将覆盖当前媒体目录中的文件。\n\n确定要继续吗？`)) {
+        return;
+    }
+    
+    showLoading('正在恢复媒体文件，请稍候...');
+    
+    try {
+        const response = await fetch(`/cmdb/backup/restore_media/${encodeURIComponent(filename)}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('✅ ' + result.message, 'success');
+        } else {
+            showAlert('❌ 恢复失败: ' + result.error, 'danger');
+        }
+    } catch (error) {
+        showAlert('❌ 恢复失败: ' + error.message, 'danger');
+    } finally {
+        hideLoading();
     }
 }
 

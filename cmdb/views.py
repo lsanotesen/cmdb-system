@@ -19,6 +19,8 @@ import time
 import threading
 import logging
 import uuid
+import shutil
+import tarfile
 from datetime import datetime
 
 # 导入硬件采集模块
@@ -3078,7 +3080,8 @@ def get_backup_config():
         'keep_count': 7,
         'auto_backup_enabled': False,
         'auto_backup_time': '02:00',
-        'auto_backup_cron': '0 2 * * *'
+        'auto_backup_cron': '0 2 * * *',
+        'backup_media_enabled': True
     }
     
     if os.path.exists(config_file):
@@ -3160,6 +3163,8 @@ def save_backup_config_api(request):
                 current_config['auto_backup_cron'] = f'{minute} {hour} * * *'
         if 'auto_backup_cron' in data:
             current_config['auto_backup_cron'] = data['auto_backup_cron']
+        if 'backup_media_enabled' in data:
+            current_config['backup_media_enabled'] = data['backup_media_enabled']
         
         success, error = save_backup_config(current_config)
         
@@ -3213,9 +3218,19 @@ def create_database_backup(request):
             f.write(result.stdout)
 
         file_size = os.path.getsize(filepath)
-        cleanup_old_backups(backup_dir, config['keep_count'], filename)
         
-        # 创建备份记录
+        media_backup_filename = None
+        media_backup_size = 0
+        media_backup_error = None
+        
+        if config.get('backup_media_enabled', True):
+            try:
+                media_backup_filename, media_backup_size = create_media_backup(backup_dir, timestamp)
+            except Exception as e:
+                media_backup_error = str(e)
+        
+        cleanup_old_backups(backup_dir, config.get('keep_count', 7), filename)
+        
         size_str = f"{file_size / (1024 * 1024):.2f} MB" if file_size > 1024*1024 else f"{file_size / 1024:.2f} KB"
         BackupRecord.objects.create(
             backup_type='full',
@@ -3225,20 +3240,68 @@ def create_database_backup(request):
             status='success'
         )
         
-        return JsonResponse({
+        response_data = {
             'success': True,
             'filename': filename,
             'file_size': file_size,
             'message': '数据库备份成功'
-        })
+        }
+        
+        if media_backup_filename:
+            response_data['media_filename'] = media_backup_filename
+            response_data['media_file_size'] = media_backup_size
+            response_data['message'] += f'，媒体文件备份成功 ({format_file_size(media_backup_size)})'
+        elif media_backup_error:
+            response_data['media_error'] = media_backup_error
+            response_data['message'] += f'，媒体文件备份失败: {media_backup_error}'
+        
+        return JsonResponse(response_data)
     except Exception as e:
-        # 创建失败记录
         BackupRecord.objects.create(
             backup_type='full',
-            backup_name=filename,
+            backup_name=filename if 'filename' in dir() else 'unknown',
             status='failed'
         )
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+def create_media_backup(backup_dir, timestamp):
+    """创建媒体文件备份"""
+    from django.conf import settings
+    
+    media_root = settings.MEDIA_ROOT
+    if not os.path.exists(media_root):
+        return None, 0
+    
+    has_files = False
+    for root, dirs, files in os.walk(media_root):
+        if files:
+            has_files = True
+            break
+    
+    if not has_files:
+        return None, 0
+    
+    media_filename = f'cmdb_media_backup_{timestamp}.tar.gz'
+    media_filepath = os.path.join(backup_dir, media_filename)
+    
+    with tarfile.open(media_filepath, 'w:gz') as tar:
+        tar.add(media_root, arcname='media')
+    
+    media_size = os.path.getsize(media_filepath)
+    return media_filename, media_size
+
+
+def format_file_size(size):
+    """格式化文件大小"""
+    if size > 1024 * 1024 * 1024:
+        return f"{size / (1024 * 1024 * 1024):.2f} GB"
+    elif size > 1024 * 1024:
+        return f"{size / (1024 * 1024):.2f} MB"
+    elif size > 1024:
+        return f"{size / 1024:.2f} KB"
+    else:
+        return f"{size} B"
 
 
 @login_required
@@ -3616,6 +3679,86 @@ def download_backup(request, filename):
 
 
 @login_required
+def restore_media_backup(request, filename):
+    """恢复媒体文件备份"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': '只支持POST请求'})
+    
+    if not filename.startswith('cmdb_media_backup_') or not filename.endswith('.tar.gz'):
+        return JsonResponse({'success': False, 'error': '无效的媒体备份文件'})
+    
+    try:
+        config = get_backup_config()
+        backup_dir = config['backup_dir']
+        filepath = os.path.join(backup_dir, filename)
+        
+        if not os.path.exists(filepath):
+            return JsonResponse({'success': False, 'error': '备份文件不存在'})
+        
+        media_root = settings.MEDIA_ROOT
+        if os.path.exists(media_root):
+            backup_media_dir = os.path.join(media_root, f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+            os.makedirs(backup_media_dir, exist_ok=True)
+            for item in os.listdir(media_root):
+                if item.startswith('backup_'):
+                    continue
+                item_path = os.path.join(media_root, item)
+                if os.path.isdir(item_path):
+                    shutil.move(item_path, os.path.join(backup_media_dir, item))
+                else:
+                    shutil.move(item_path, os.path.join(backup_media_dir, item))
+        
+        with tarfile.open(filepath, 'r:gz') as tar:
+            tar.extractall(path=os.path.dirname(media_root))
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'媒体文件恢复成功！原文件已备份到 {backup_media_dir if "backup_media_dir" in dir() else "无"}'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def restore_media_backup_upload(request):
+    """通过上传文件恢复媒体备份"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': '只支持POST请求'})
+    
+    try:
+        if 'media_file' not in request.FILES:
+            return JsonResponse({'success': False, 'error': '请选择要上传的媒体备份文件'})
+        
+        media_file = request.FILES['media_file']
+        if not media_file.name.endswith('.tar.gz'):
+            return JsonResponse({'success': False, 'error': '只支持 .tar.gz 格式的备份文件'})
+        
+        media_root = settings.MEDIA_ROOT
+        
+        if os.path.exists(media_root):
+            backup_media_dir = os.path.join(media_root, f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+            os.makedirs(backup_media_dir, exist_ok=True)
+            for item in os.listdir(media_root):
+                if item.startswith('backup_'):
+                    continue
+                item_path = os.path.join(media_root, item)
+                if os.path.isdir(item_path):
+                    shutil.move(item_path, os.path.join(backup_media_dir, item))
+                else:
+                    shutil.move(item_path, os.path.join(backup_media_dir, item))
+        
+        with tarfile.open(fileobj=media_file, mode='r:gz') as tar:
+            tar.extractall(path=os.path.dirname(media_root))
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'媒体文件恢复成功！原文件已备份到 {backup_media_dir}'
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
 def get_backup_list_with_stats(request):
     config = get_backup_config()
     backup_dir = config['backup_dir']
@@ -3691,6 +3834,34 @@ def get_backup_list_with_stats(request):
                     'backup_type': backup_type,
                     'is_directory': False
                 })
+            
+            # 支持媒体备份文件 .tar.gz
+            elif fname.endswith('.tar.gz') and fname.startswith('cmdb_media_backup_') and os.path.isfile(filepath):
+                file_size = os.path.getsize(filepath)
+                total_size += file_size
+                
+                try:
+                    time_str = fname.replace('cmdb_media_backup_', '').replace('.tar.gz', '')
+                    created_at = datetime.strptime(time_str, '%Y%m%d_%H%M%S')
+                    created_at_str = created_at.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    created_at_str = '未知'
+                
+                if file_size < 1024:
+                    size_str = f"{file_size} B"
+                elif file_size < 1024 * 1024:
+                    size_str = f"{file_size / 1024:.2f} KB"
+                else:
+                    size_str = f"{file_size / (1024 * 1024):.2f} MB"
+                
+                files.append({
+                    'filename': fname,
+                    'created_at': created_at_str,
+                    'size': size_str,
+                    'file_size': file_size,
+                    'backup_type': 'media',
+                    'is_directory': False
+                })
     
     try:
         disk = shutil.disk_usage(backup_dir)
@@ -3710,18 +3881,31 @@ def get_backup_list_with_stats(request):
 
 def cleanup_old_backups(backup_dir, keep_count, current_file=None):
     try:
-        files = []
+        db_files = []
+        media_files = []
         for fname in os.listdir(backup_dir):
-            if fname.endswith('.sql.gz'):
-                filepath = os.path.join(backup_dir, fname)
-                if os.path.isfile(filepath):
-                    files.append({
+            filepath = os.path.join(backup_dir, fname)
+            if os.path.isfile(filepath):
+                if fname.endswith('.sql.gz'):
+                    db_files.append({
+                        'name': fname, 'path': filepath, 'mtime': os.path.getmtime(filepath)
+                    })
+                elif fname.endswith('.tar.gz') and fname.startswith('cmdb_media_backup_'):
+                    media_files.append({
                         'name': fname, 'path': filepath, 'mtime': os.path.getmtime(filepath)
                     })
 
-        files.sort(key=lambda x: x['mtime'], reverse=True)
+        db_files.sort(key=lambda x: x['mtime'], reverse=True)
+        media_files.sort(key=lambda x: x['mtime'], reverse=True)
 
-        for i, f in enumerate(files):
+        for i, f in enumerate(db_files):
+            if i >= keep_count:
+                try:
+                    os.remove(f['path'])
+                except:
+                    pass
+        
+        for i, f in enumerate(media_files):
             if i >= keep_count:
                 try:
                     os.remove(f['path'])

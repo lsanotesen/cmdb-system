@@ -2,12 +2,12 @@ import os
 import sys
 import json
 import gzip
+import tarfile
 try:
     from apscheduler import Scheduler
     from apscheduler.triggers.cron import CronTrigger
     USE_OLD_API = True
 except ImportError:
-    # 兼容新版本 apscheduler
     from apscheduler.schedulers.background import BackgroundScheduler as Scheduler
     from apscheduler.triggers.cron import CronTrigger
     USE_OLD_API = False
@@ -28,6 +28,7 @@ def create_database_backup_task():
     """执行数据库备份任务"""
     _init_django()
     from .models import BackupRecord
+    from django.conf import settings
     config = get_backup_config()
 
     if not config.get('auto_backup_enabled', False):
@@ -64,6 +65,13 @@ def create_database_backup_task():
         if result.returncode == 0:
             with gzip.open(filepath, 'wb') as f:
                 f.write(result.stdout)
+            
+            if config.get('backup_media_enabled', True):
+                try:
+                    create_media_backup_task(backup_dir, timestamp, settings.MEDIA_ROOT)
+                except Exception as e:
+                    print(f"媒体文件备份失败: {str(e)}")
+            
             BackupRecord.objects.create(
                 backup_type='full',
                 backup_name=filename,
@@ -88,20 +96,51 @@ def create_database_backup_task():
             error_message=str(e)
         )
 
+
+def create_media_backup_task(backup_dir, timestamp, media_root):
+    """创建媒体文件备份"""
+    if not os.path.exists(media_root):
+        return
+    
+    has_files = False
+    for root, dirs, files in os.walk(media_root):
+        if files:
+            has_files = True
+            break
+    
+    if not has_files:
+        return
+    
+    media_filename = f'cmdb_media_backup_{timestamp}.tar.gz'
+    media_filepath = os.path.join(backup_dir, media_filename)
+    
+    with tarfile.open(media_filepath, 'w:gz') as tar:
+        tar.add(media_root, arcname='media')
+    
+    print(f"媒体文件备份成功: {media_filename}")
+
 def cleanup_old_backups(backup_dir, keep_count, exclude_filename):
     """清理旧备份文件"""
     try:
-        backup_files = []
+        db_backup_files = []
+        media_backup_files = []
         for f in os.listdir(backup_dir):
-            if f.startswith('cmdb_db_backup_') and f.endswith('.sql.gz'):
-                filepath = os.path.join(backup_dir, f)
-                if os.path.isfile(filepath) and f != exclude_filename:
-                    backup_files.append((os.path.getmtime(filepath), filepath))
+            filepath = os.path.join(backup_dir, f)
+            if os.path.isfile(filepath):
+                if f.startswith('cmdb_db_backup_') and f.endswith('.sql.gz') and f != exclude_filename:
+                    db_backup_files.append((os.path.getmtime(filepath), filepath))
+                elif f.startswith('cmdb_media_backup_') and f.endswith('.tar.gz'):
+                    media_backup_files.append((os.path.getmtime(filepath), filepath))
 
-        backup_files.sort(reverse=True)
+        db_backup_files.sort(reverse=True)
+        media_backup_files.sort(reverse=True)
 
-        if len(backup_files) > keep_count:
-            for mtime, filepath in backup_files[keep_count:]:
+        if len(db_backup_files) > keep_count:
+            for mtime, filepath in db_backup_files[keep_count:]:
+                os.remove(filepath)
+        
+        if len(media_backup_files) > keep_count:
+            for mtime, filepath in media_backup_files[keep_count:]:
                 os.remove(filepath)
     except Exception as e:
         print(f"清理旧备份失败: {str(e)}")
@@ -120,7 +159,8 @@ def get_backup_config():
         'keep_count': 7,
         'auto_backup_enabled': False,
         'auto_backup_time': '02:00',
-        'auto_backup_cron': '0 2 * * *'
+        'auto_backup_cron': '0 2 * * *',
+        'backup_media_enabled': True
     }
 
     if os.path.exists(config_file):
