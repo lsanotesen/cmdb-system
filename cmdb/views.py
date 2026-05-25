@@ -306,7 +306,7 @@ def asset_list(request):
         filtered_count = len(hosts)
         has_filter = keyword or idc_id or asset_type or status or group_filter or cabinet_filter
         
-        return render(request, 'cmdb/asset_list.html', {
+        response = render(request, 'cmdb/asset_list.html', {
             'hosts': hosts,
             'keyword': keyword,
             'idc_id': idc_id,
@@ -323,6 +323,13 @@ def asset_list(request):
             'filtered_count': filtered_count,
             'has_filter': has_filter
         })
+        
+        # 添加缓存控制头，防止浏览器缓存页面
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
     except Exception as e:
         messages.error(request, f'获取资产列表失败: {str(e)}')
         return render(request, 'cmdb/asset_list.html', {'hosts': []})
@@ -2497,7 +2504,7 @@ def static_asset_list(request):
         filtered_count = assets.count()
         has_filter = keyword or cabinet_filter or department_filter or server_type_filter or status_filter
         
-        return render(request, 'cmdb/static_asset_list.html', {
+        response = render(request, 'cmdb/static_asset_list.html', {
             'assets': assets,
             'keyword': keyword,
             'cabinet_filter': cabinet_filter,
@@ -2512,6 +2519,13 @@ def static_asset_list(request):
             'server_type_list': server_type_list,
             'status_list': status_list
         })
+        
+        # 添加缓存控制头，防止浏览器缓存页面
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
     except Exception as e:
         messages.error(request, f'获取静态资产列表失败: {str(e)}')
         return render(request, 'cmdb/static_asset_list.html', {'assets': []})
