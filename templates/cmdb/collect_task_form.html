@@ -160,12 +160,14 @@
             </div>
 
             <div class="form-group" style="margin-top: 20px;">
-                <button type="submit" class="btn btn-success" style="padding: 12px 40px;">
-                    {% if action == 'add' %}➕ 创建任务{% else %}💾 保存修改{% endif %}
-                </button>
-                {% if action == 'edit' %}
-                <a href="{% url 'run_collect_task' task.id %}" class="btn btn-success" style="padding: 12px 40px;">▶️ 立即执行</a>
-                {% endif %}
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-success">
+                        {% if action == 'add' %}创建{% else %}保存{% endif %}
+                    </button>
+                    {% if action == 'edit' %}
+                    <a href="{% url 'run_collect_task' task.id %}" class="btn btn-success">执行</a>
+                    {% endif %}
+                </div>
             </div>
         </form>
     </div>

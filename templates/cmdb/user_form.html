@@ -86,9 +86,9 @@
 
             <div class="btn-group" style="margin-top: 20px;">
                 <button type="submit" class="btn btn-primary">
-                    {% if user.id %}保存修改{% else %}创建用户{% endif %}
+                    {% if user.id %}保存{% else %}创建{% endif %}
                 </button>
-                <button type="button" class="btn btn-secondary" onclick="location.href='{% url 'user_management' %}'">取消</button>
+                <button type="button" class="btn btn-secondary" onclick="location.href='{% url 'user_management' %}'">返回</button>
             </div>
         </form>
     </div>
