@@ -3748,13 +3748,29 @@ def restore_media_backup_upload(request):
                 else:
                     shutil.move(item_path, os.path.join(backup_media_dir, item))
         
+        # 将上传的文件保存到临时位置再解压
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.tar.gz', delete=False) as temp_file:
+            temp_path = temp_file.name
+            for chunk in media_file.chunks():
+                temp_file.write(chunk)
+        
         try:
-            with tarfile.open(fileobj=media_file, mode='r:gz') as tar:
+            with tarfile.open(temp_path, 'r:gz') as tar:
+                # 检查是否是有效的tar文件
+                if len(tar.getnames()) == 0:
+                    return JsonResponse({'success': False, 'error': '无效的媒体备份文件（文件为空）'})
                 tar.extractall(path=os.path.dirname(media_root))
-        except tarfile.ReadError:
-            return JsonResponse({'success': False, 'error': '无效的媒体备份文件（文件可能已损坏或格式不正确）'})
+        except tarfile.ReadError as e:
+            return JsonResponse({'success': False, 'error': f'无效的媒体备份文件：{str(e)}'})
+        except tarfile.CompressionError as e:
+            return JsonResponse({'success': False, 'error': f'文件压缩格式错误：{str(e)}'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': f'解压文件失败：{str(e)}'})
+        finally:
+            # 清理临时文件
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
         
         message = '媒体文件恢复成功！'
         if backup_media_dir:
