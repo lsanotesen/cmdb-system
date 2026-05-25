@@ -1859,8 +1859,13 @@ def immediate_collect(request, task_id):
                                             host.device_model = f"{hardware_info.vendor} {hardware_info.product}".strip()
                                             host.bm_ip = hardware_info.bm_ip
                                             host.asset_type = hardware_info.asset_type
+                                        # 无论是否更新其他信息，都更新设备状态
+                                        if result['status'] == 'success':
+                                            host.status = '1'  # 使用中
+                                        else:
+                                            host.status = '4'  # 其他
                                         host.save()
-                                        logger.error(f"[CollectTask] 资产 {ip} 信息已更新")
+                                        logger.error(f"[CollectTask] 资产 {ip} 信息已更新，状态: {'使用中' if result['status'] == 'success' else '其他'}")
                                     except Host.DoesNotExist:
                                         # 资产不存在，创建新资产
                                         # 确定设备状态：采集成功为使用中，失败为其他
