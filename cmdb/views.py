@@ -1457,73 +1457,73 @@ def run_collect_task(request, task_id):
                                     result['output'] = '采集成功'
                                     result['status'] = 'success'
 
-                                    # 更新资产信息
-                                    try:
-                                        # 根据IP地址查找对应的Host对象
-                                        host = Host.objects.get(ip=ip)
-                                        # 更新资产信息
-                                        if task.update_hostname:
-                                            host.hostname = hardware_info.hostname
-                                        if task.update_os:
-                                            host.os = f"{hardware_info.os} {hardware_info.os_version}".strip()
-                                        if task.update_cpu:
-                                            host.cpu_model = hardware_info.cpu_model
-                                            host.cpu_num = str(hardware_info.cpu_num)
-                                            host.cpu_cores = str(hardware_info.cpu_cores)
-                                        if task.update_memory:
-                                            host.memory = hardware_info.memory_total
-                                        if task.update_disk:
-                                            host.disk = hardware_info.disk_info
-                                        if task.update_gpu:
-                                            host.gpu_model = hardware_info.gpu_model
-                                        if task.update_sn:
-                                            host.sn = hardware_info.sn
-                                        if task.update_device_info:
-                                            host.device_model = f"{hardware_info.vendor} {hardware_info.product}".strip()
-                                            host.bm_ip = hardware_info.bm_ip
-                                            host.asset_type = hardware_info.asset_type
-                                        # 无论是否更新其他信息，都更新设备状态和默认值
-                                        if result['status'] == 'success':
-                                            host.status = '1'  # 使用中
-                                        else:
-                                            host.status = '4'  # 其他
-                                        # 如果部门为空，设置默认值
-                                        if not host.department:
-                                            host.department = '互联网大数据'
-                                        # 如果机房为空，设置默认值
-                                        if not host.idc:
-                                            idc = Idc.objects.filter(name='智能化104机房').first()
-                                            host.idc = idc
-                                        host.save()
-                                        logger.error(f"[CollectTask] 资产 {ip} 信息已更新，状态: {'使用中' if result['status'] == 'success' else '其他'}, 部门: {host.department}, 机房: {host.idc.name if host.idc else '未设置'}")
-                                    except Host.DoesNotExist:
-                                        # 资产不存在，创建新资产
-                                        # 查找智能化104机房
-                                        idc = Idc.objects.filter(name='智能化104机房').first()
-                                        # 确定设备状态：采集成功为使用中，失败为其他
-                                        device_status = '1' if result['status'] == 'success' else '4'
-                                        host = Host(
-                                            ip=ip,
-                                            hostname=hardware_info.hostname if task.update_hostname else f"host-{ip}",
-                                            os=f"{hardware_info.os} {hardware_info.os_version}".strip() if task.update_os else "",
-                                            cpu_model=hardware_info.cpu_model if task.update_cpu else "",
-                                            cpu_num=str(hardware_info.cpu_num) if task.update_cpu else "",
-                                            cpu_cores=str(hardware_info.cpu_cores) if task.update_cpu else "",
-                                            memory=hardware_info.memory_total if task.update_memory else "",
-                                            disk=hardware_info.disk_info if task.update_disk else "",
-                                            gpu_model=hardware_info.gpu_model if task.update_gpu else "",
-                                            sn=hardware_info.sn if task.update_sn else "",
-                                            device_model=f"{hardware_info.vendor} {hardware_info.product}".strip() if task.update_device_info else "",
-                                            bm_ip=hardware_info.bm_ip if task.update_device_info else "",
-                                            asset_type=hardware_info.asset_type if task.update_device_info else "服务器",
-                                            status=device_status,
-                                            department='互联网大数据',  # 默认部门
-                                            idc=idc  # 默认机房
-                                        )
-                                        host.save()
-                                        logger.error(f"[CollectTask] 资产 {ip} 不存在，已创建新资产，状态: {'使用中' if device_status == '1' else '其他'}, 部门: 互联网大数据, 机房: 智能化104机房")
-                                    except Exception as e:
-                                        logger.error(f"[CollectTask] 更新资产 {ip} 信息失败: {str(e)}")
+                            # 更新资产信息（无论采集成功或失败都更新状态）
+                            try:
+                                # 根据IP地址查找对应的Host对象
+                                host = Host.objects.get(ip=ip)
+                                # 更新资产信息
+                                if task.update_hostname:
+                                    host.hostname = hardware_info.hostname
+                                if task.update_os:
+                                    host.os = f"{hardware_info.os} {hardware_info.os_version}".strip()
+                                if task.update_cpu:
+                                    host.cpu_model = hardware_info.cpu_model
+                                    host.cpu_num = str(hardware_info.cpu_num)
+                                    host.cpu_cores = str(hardware_info.cpu_cores)
+                                if task.update_memory:
+                                    host.memory = hardware_info.memory_total
+                                if task.update_disk:
+                                    host.disk = hardware_info.disk_info
+                                if task.update_gpu:
+                                    host.gpu_model = hardware_info.gpu_model
+                                if task.update_sn:
+                                    host.sn = hardware_info.sn
+                                if task.update_device_info:
+                                    host.device_model = f"{hardware_info.vendor} {hardware_info.product}".strip()
+                                    host.bm_ip = hardware_info.bm_ip
+                                    host.asset_type = hardware_info.asset_type
+                                # 无论是否更新其他信息，都更新设备状态和默认值
+                                if result['status'] == 'success':
+                                    host.status = '1'  # 使用中
+                                else:
+                                    host.status = '4'  # 其他
+                                # 如果部门为空，设置默认值
+                                if not host.department:
+                                    host.department = '互联网大数据'
+                                # 如果机房为空，设置默认值
+                                if not host.idc:
+                                    idc = Idc.objects.filter(name='智能化104机房').first()
+                                    host.idc = idc
+                                host.save()
+                                logger.error(f"[CollectTask] 资产 {ip} 信息已更新，状态: {'使用中' if result['status'] == 'success' else '其他'}, 部门: {host.department}, 机房: {host.idc.name if host.idc else '未设置'}")
+                            except Host.DoesNotExist:
+                                # 资产不存在，创建新资产
+                                # 查找智能化104机房
+                                idc = Idc.objects.filter(name='智能化104机房').first()
+                                # 确定设备状态：采集成功为使用中，失败为其他
+                                device_status = '1' if result['status'] == 'success' else '4'
+                                host = Host(
+                                    ip=ip,
+                                    hostname=hardware_info.hostname if task.update_hostname else f"host-{ip}",
+                                    os=f"{hardware_info.os} {hardware_info.os_version}".strip() if task.update_os else "",
+                                    cpu_model=hardware_info.cpu_model if task.update_cpu else "",
+                                    cpu_num=str(hardware_info.cpu_num) if task.update_cpu else "",
+                                    cpu_cores=str(hardware_info.cpu_cores) if task.update_cpu else "",
+                                    memory=hardware_info.memory_total if task.update_memory else "",
+                                    disk=hardware_info.disk_info if task.update_disk else "",
+                                    gpu_model=hardware_info.gpu_model if task.update_gpu else "",
+                                    sn=hardware_info.sn if task.update_sn else "",
+                                    device_model=f"{hardware_info.vendor} {hardware_info.product}".strip() if task.update_device_info else "",
+                                    bm_ip=hardware_info.bm_ip if task.update_device_info else "",
+                                    asset_type=hardware_info.asset_type if task.update_device_info else "服务器",
+                                    status=device_status,
+                                    department='互联网大数据',  # 默认部门
+                                    idc=idc  # 默认机房
+                                )
+                                host.save()
+                                logger.error(f"[CollectTask] 资产 {ip} 不存在，已创建新资产，状态: {'使用中' if device_status == '1' else '其他'}, 部门: 互联网大数据, 机房: 智能化104机房")
+                            except Exception as e:
+                                logger.error(f"[CollectTask] 更新资产 {ip} 信息失败: {str(e)}")
 
                     # 保存历史记录
                     CollectHistory.objects.create(
