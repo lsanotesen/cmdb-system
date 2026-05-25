@@ -16,14 +16,18 @@
             <div>
                 <a href="#asset-management" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">1. 资产管理</a>
                 <a href="#static-asset" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">2. 静态资产管理</a>
-                <a href="#ssh-config" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">3. SSH配置管理</a>
-                <a href="#hardware-collect" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">4. 硬件信息采集</a>
+                <a href="#idc-cabinet" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">3. 机房与机柜管理</a>
+                <a href="#spare-parts" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">4. 备件与配件管理</a>
             </div>
             <div>
-                <a href="#idc-cabinet" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">5. 机房与机柜管理</a>
-                <a href="#permission" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">6. 权限管理</a>
-                <a href="#backup" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">7. 数据备份</a>
-                <a href="#faq" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">8. 常见问题</a>
+                <a href="#asset-relations" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">5. 资产关系管理</a>
+                <a href="#lifecycle" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">6. 生命周期管理</a>
+                <a href="#retired-equipment" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">7. 已退库设备</a>
+                <a href="#hardware-collect" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">8. 硬件信息采集</a>
+                <a href="#ssh-config" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">9. SSH配置管理</a>
+                <a href="#permission" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">10. 权限管理</a>
+                <a href="#backup" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">11. 数据备份</a>
+                <a href="#faq" style="display: block; padding: 4px 0; color: #1890ff; text-decoration: none;">12. 常见问题</a>
             </div>
         </div>
     </div>
@@ -53,7 +57,7 @@
     <!-- 静态资产管理 -->
     <section id="static-asset" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            📦 2. 静态资产管理
+            � 2. 静态资产管理
         </h2>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>静态资产列表</strong>：查看所有静态资产（如网络设备、安全设备等）</li>
@@ -63,26 +67,99 @@
         </ul>
     </section>
 
-    <!-- SSH配置管理 -->
-    <section id="ssh-config" style="margin-bottom: 32px;">
+    <!-- 机房与机柜管理 -->
+    <section id="idc-cabinet" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            🔐 3. SSH配置管理
+            🏢 3. 机房与机柜管理
+        </h2>
+
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">3.1 机房管理</h3>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>添加机房</strong>：填写机房名称、地址、运营商、联系人等信息</li>
+            <li><strong>机房列表</strong>：查看所有机房信息，支持搜索和筛选</li>
+        </ul>
+
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">3.2 机柜管理</h3>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>添加机柜</strong>：选择所属机房，填写机柜名称、位置、U位数量</li>
+            <li><strong>机柜布局图</strong>：点击"布局图"按钮查看可视化机柜布局</li>
+            <li><strong>布局图导出</strong>：支持导出Excel、HTML、PNG图片格式</li>
+        </ul>
+    </section>
+
+    <!-- 备件与配件管理 -->
+    <section id="spare-parts" style="margin-bottom: 32px;">
+        <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
+            � 4. 备件与配件管理
+        </h2>
+
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">4.1 服务器备件管理</h3>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>备件列表</strong>：查看所有服务器备件信息，包括CPU、内存、硬盘、网卡等</li>
+            <li><strong>添加备件</strong>：点击"添加备件"按钮，填写备件名称、型号、数量、位置等信息</li>
+            <li><strong>备件图片</strong>：支持上传备件的实物图片，便于识别和管理</li>
+            <li><strong>库存管理</strong>：记录备件的入库、出库和库存数量</li>
+            <li><strong>状态管理</strong>：标记备件状态（在库、使用中、已损坏等）</li>
+        </ul>
+
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">4.2 办公机配件管理</h3>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>配件列表</strong>：查看所有办公机配件，如显示器、键盘、鼠标、耳机等</li>
+            <li><strong>添加配件</strong>：填写配件名称、型号、序列号、所属部门等信息</li>
+            <li><strong>配件分配</strong>：将配件分配给特定用户或办公设备</li>
+            <li><strong>配件图片</strong>：支持上传配件图片，方便识别</li>
+            <li><strong>借用记录</strong>：记录配件的借用和归还情况</li>
+        </ul>
+    </section>
+
+    <!-- 资产关系管理 -->
+    <section id="asset-relations" style="margin-bottom: 32px;">
+        <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
+            � 5. 资产关系管理
         </h2>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
-            <li><strong>添加SSH配置</strong>：填写目标服务器IP、端口、用户名、密码等信息</li>
-            <li><strong>跳板机配置</strong>：如果需要通过跳板机连接，填写跳板机信息</li>
-            <li><strong>批量导入</strong>：下载模板Excel，填写多台服务器配置后批量导入</li>
-            <li><strong>启用/禁用</strong>：可以启用或禁用SSH配置，禁用的配置不会参与采集</li>
+            <li><strong>资产关联</strong>：建立资产之间的关联关系，如主机与备件、虚拟机与宿主机等</li>
+            <li><strong>依赖关系</strong>：记录资产之间的依赖关系，便于追踪和维护</li>
+            <li><strong>层级结构</strong>：支持树形结构展示资产关系</li>
+            <li><strong>关系查询</strong>：可以查询某一资产的所有关联资产</li>
+        </ul>
+    </section>
+
+    <!-- 生命周期管理 -->
+    <section id="lifecycle" style="margin-bottom: 32px;">
+        <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
+            � 6. 生命周期管理
+        </h2>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>资产状态跟踪</strong>：记录资产从入库、使用、维护到报废的整个生命周期</li>
+            <li><strong>状态变更记录</strong>：记录每次状态变更的时间和原因</li>
+            <li><strong>维护计划</strong>：设置定期维护计划，如硬件巡检、软件更新等</li>
+            <li><strong>保修管理</strong>：记录资产的保修信息和到期提醒</li>
+            <li><strong>折旧计算</strong>：支持资产折旧计算和报表生成</li>
+        </ul>
+    </section>
+
+    <!-- 已退库设备 -->
+    <section id="retired-equipment" style="margin-bottom: 32px;">
+        <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
+            �️ 7. 已退库设备
+        </h2>
+        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
+            <li><strong>退库列表</strong>：查看所有已退库的设备信息</li>
+            <li><strong>退库原因</strong>：记录设备退库的原因（如报废、淘汰、损坏等）</li>
+            <li><strong>退库时间</strong>：记录设备退库的时间</li>
+            <li><strong>恢复使用</strong>：支持将退库设备恢复为正常使用状态</li>
+            <li><strong>报废处理</strong>：记录设备的报废处理方式和责任人</li>
         </ul>
     </section>
 
     <!-- 硬件信息采集 -->
     <section id="hardware-collect" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            🖥️ 4. 硬件信息采集
+            🖥️ 8. 硬件信息采集
         </h2>
         
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">4.1 创建采集任务</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">8.1 创建采集任务</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>任务名称</strong>：设置任务名称，如"每日采集任务"</li>
             <li><strong>SSH配置</strong>：选择使用的SSH配置，留空则使用所有启用的配置</li>
@@ -91,14 +168,14 @@
             <li><strong>定时采集</strong>：设置Cron表达式实现定时自动采集</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">4.2 立即采集</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">8.2 立即采集</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li>点击"⚡ 立即采集"按钮启动即时采集任务</li>
             <li>采集进度页面实时显示采集状态</li>
             <li>采集完成后自动跳转到采集结果页面</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">4.3 Cron表达式说明</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">8.3 Cron表达式说明</h3>
         <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-left: 24px;">
             <p style="margin-bottom: 8px; font-weight: 500;">常用Cron表达式：</p>
             <ul style="color: #555; line-height: 1.8;">
@@ -110,33 +187,26 @@
         </div>
     </section>
 
-    <!-- 机房与机柜管理 -->
-    <section id="idc-cabinet" style="margin-bottom: 32px;">
+    <!-- SSH配置管理 -->
+    <section id="ssh-config" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            🏢 5. 机房与机柜管理
+            🔐 9. SSH配置管理
         </h2>
-
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">5.1 机房管理</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
-            <li><strong>添加机房</strong>：填写机房名称、地址、运营商、联系人等信息</li>
-            <li><strong>机房列表</strong>：查看所有机房信息，支持搜索和筛选</li>
-        </ul>
-
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">5.2 机柜管理</h3>
-        <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
-            <li><strong>添加机柜</strong>：选择所属机房，填写机柜名称、位置、U位数量</li>
-            <li><strong>机柜布局图</strong>：点击"布局图"按钮查看可视化机柜布局</li>
-            <li><strong>布局图导出</strong>：支持导出Excel、HTML、PNG图片格式</li>
+            <li><strong>添加SSH配置</strong>：填写目标服务器IP、端口、用户名、密码等信息</li>
+            <li><strong>跳板机配置</strong>：如果需要通过跳板机连接，填写跳板机信息</li>
+            <li><strong>批量导入</strong>：下载模板Excel，填写多台服务器配置后批量导入</li>
+            <li><strong>启用/禁用</strong>：可以启用或禁用SSH配置，禁用的配置不会参与采集</li>
         </ul>
     </section>
 
     <!-- 权限管理 -->
     <section id="permission" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            👤 6. 权限管理
+            👤 10. 权限管理
         </h2>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">6.1 用户管理</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">10.1 用户管理</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>添加用户</strong>：填写用户名、密码、邮箱等信息</li>
             <li><strong>用户类型</strong>：分为管理员和普通用户，管理员可以访问系统设置</li>
@@ -144,14 +214,14 @@
             <li><strong>删除用户</strong>：管理员可以删除用户，但必须确保至少有一个管理员</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">6.2 角色管理</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">10.2 角色管理</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>创建角色</strong>：设置角色名称和描述</li>
             <li><strong>分配权限</strong>：为角色分配各模块的权限（查看、添加、编辑、删除、下载）</li>
             <li><strong>角色关联</strong>：将用户关联到角色，用户自动继承角色权限</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">6.3 权限说明</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">10.3 权限说明</h3>
         <div style="background: #f8f9fa; padding: 16px; border-radius: 8px; margin-left: 24px;">
             <p style="margin-bottom: 8px; font-weight: 500;">权限级别：</p>
             <ul style="color: #555; line-height: 1.8;">
@@ -165,10 +235,10 @@
     <!-- 数据备份 -->
     <section id="backup" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            💾 7. 数据备份
+            💾 11. 数据备份
         </h2>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">7.1 数据库备份</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">11.1 数据库备份</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>创建备份</strong>：点击"立即备份"按钮创建数据库备份</li>
             <li><strong>备份列表</strong>：查看所有备份记录，显示备份时间、文件大小等信息</li>
@@ -177,7 +247,7 @@
             <li><strong>自动清理</strong>：系统自动清理过期备份（可配置保留数量）</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">7.2 媒体文件备份</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">11.2 媒体文件备份</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>自动备份</strong>：创建数据库备份时，系统会自动备份媒体文件（备件图片、办公机配件图片等）</li>
             <li><strong>备份格式</strong>：媒体文件打包为 .tar.gz 格式存储</li>
@@ -185,7 +255,7 @@
             <li><strong>安全备份</strong>：恢复前系统会自动备份现有文件到 media/backup_时间戳/ 目录</li>
         </ul>
 
-        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">7.3 数据恢复</h3>
+        <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">11.3 数据恢复</h3>
         <ul style="margin-left: 24px; color: #555; line-height: 1.8;">
             <li><strong>数据库恢复</strong>：进入"数据恢复"页面，上传SQL文件后点击"开始恢复"</li>
             <li><strong>媒体文件恢复</strong>：在数据恢复页面的媒体文件恢复区域，上传 .tar.gz 备份文件后点击"恢复媒体文件"</li>
@@ -196,7 +266,7 @@
     <!-- 常见问题 -->
     <section id="faq" style="margin-bottom: 32px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #1890ff;">
-            ❓ 8. 常见问题
+            ❓ 12. 常见问题
         </h2>
 
         <h3 style="font-size: 16px; font-weight: 500; margin: 16px 0 12px;">Q: 采集失败怎么办？</h3>
