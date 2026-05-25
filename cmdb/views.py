@@ -678,11 +678,19 @@ def cabinet_list(request):
             cabinets = cabinets.filter(idc_id=idc_id)
         
         idc_list = Idc.objects.all()
-        return render(request, 'cmdb/cabinet_list.html', {
+        
+        response = render(request, 'cmdb/cabinet_list.html', {
             'cabinets': cabinets,
             'idc_list': idc_list,
             'selected_idc_id': idc_id
         })
+        
+        # 添加缓存控制头，防止浏览器缓存页面
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        
+        return response
     except Exception as e:
         messages.error(request, f'获取机柜列表失败: {str(e)}')
         return render(request, 'cmdb/cabinet_list.html', {'cabinets': []})
