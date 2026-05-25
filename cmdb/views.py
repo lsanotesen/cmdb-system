@@ -3684,8 +3684,8 @@ def restore_media_backup(request, filename):
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': '只支持POST请求'})
     
-    if not filename.startswith('cmdb_media_backup_') or not filename.endswith('.tar.gz'):
-        return JsonResponse({'success': False, 'error': '无效的媒体备份文件'})
+    if not filename.endswith('.tar.gz'):
+        return JsonResponse({'success': False, 'error': '无效的媒体备份文件（只支持 .tar.gz 格式）'})
     
     try:
         config = get_backup_config()
@@ -3734,6 +3734,7 @@ def restore_media_backup_upload(request):
             return JsonResponse({'success': False, 'error': '只支持 .tar.gz 格式的备份文件'})
         
         media_root = settings.MEDIA_ROOT
+        backup_media_dir = None
         
         if os.path.exists(media_root):
             backup_media_dir = os.path.join(media_root, f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
@@ -3747,12 +3748,21 @@ def restore_media_backup_upload(request):
                 else:
                     shutil.move(item_path, os.path.join(backup_media_dir, item))
         
-        with tarfile.open(fileobj=media_file, mode='r:gz') as tar:
-            tar.extractall(path=os.path.dirname(media_root))
+        try:
+            with tarfile.open(fileobj=media_file, mode='r:gz') as tar:
+                tar.extractall(path=os.path.dirname(media_root))
+        except tarfile.ReadError:
+            return JsonResponse({'success': False, 'error': '无效的媒体备份文件（文件可能已损坏或格式不正确）'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'解压文件失败：{str(e)}'})
+        
+        message = '媒体文件恢复成功！'
+        if backup_media_dir:
+            message += f' 原文件已备份到 {backup_media_dir}'
         
         return JsonResponse({
             'success': True,
-            'message': f'媒体文件恢复成功！原文件已备份到 {backup_media_dir}'
+            'message': message
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
