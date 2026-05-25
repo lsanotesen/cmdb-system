@@ -3758,13 +3758,22 @@ def restore_media_backup_upload(request):
         try:
             with tarfile.open(temp_path, 'r:gz') as tar:
                 # 检查是否是有效的tar文件
-                if len(tar.getnames()) == 0:
+                members = tar.getmembers()
+                if len(members) == 0:
                     return JsonResponse({'success': False, 'error': '无效的媒体备份文件（文件为空）'})
+                
+                # 修复权限问题：重置所有文件的权限，避免root权限文件无法访问
+                for member in members:
+                    # 重置权限为可读写
+                    member.mode = 0o644 if member.isfile() else 0o755
+                
                 tar.extractall(path=os.path.dirname(media_root))
         except tarfile.ReadError as e:
             return JsonResponse({'success': False, 'error': f'无效的媒体备份文件：{str(e)}'})
         except tarfile.CompressionError as e:
             return JsonResponse({'success': False, 'error': f'文件压缩格式错误：{str(e)}'})
+        except PermissionError as e:
+            return JsonResponse({'success': False, 'error': f'权限不足：{str(e)}。请检查媒体目录权限'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': f'解压文件失败：{str(e)}'})
         finally:
