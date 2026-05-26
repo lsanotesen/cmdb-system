@@ -329,7 +329,7 @@ async function refreshBackups() {
             tbody.innerHTML = '';
             data.files.forEach(file => {
                 const isMediaBackup = file.filename.includes('media_backup');
-                const backupTypeLabel = isMediaBackup ? '媒体备份' : (file.backup_type === 'manual' ? '手动' : '自动');
+                const backupTypeLabel = isMediaBackup ? '媒体备份' : (file.backup_type === 'manual' ? '手动备份' : '数据库备份');
                 const badgeClass = isMediaBackup ? 'badge-warning' : (file.backup_type === 'manual' ? 'badge-info' : 'badge-success');
                 
                 const row = document.createElement('tr');
