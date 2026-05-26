@@ -60,7 +60,7 @@
                 <th>品牌</th>
                 <th>型号</th>
                 <th>SN</th>
-                <th>来源办公电脑</th>
+                <th>存放位置</th>
                 <th>拆机时间</th>
                 <th>当前状态</th>
                 <th>更新时间</th>
@@ -93,7 +93,7 @@
                     <td>{{ part.brand|default:"-" }}</td>
                     <td>{{ part.model|default:"-" }}</td>
                     <td>{{ part.serial_number|default:"-" }}</td>
-                    <td>{{ part.source_computer|default:"-" }}</td>
+                    <td>{{ part.location|default:"-" }}</td>
                     <td>{{ part.dismantle_date|date:"Y-m-d"|default:"-" }}</td>
                     <td>
                         {% if part.status == 'new' %}<span class="badge bg-success">全新</span>{% endif %}
