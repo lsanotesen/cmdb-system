@@ -4851,6 +4851,55 @@ def api_install_sparepart(request):
 
 
 @login_required
+def api_return_sparepart(request):
+    """将备件退库到已退库设备列表"""
+    if request.method == 'POST':
+        try:
+            data = request.POST
+            sparepart_id = data.get('sparepart_id')
+            return_reason = data.get('return_reason', '')
+
+            with transaction.atomic():
+                sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
+                
+                # 创建子资产Host记录
+                hostname = f"returned-sparepart-{sparepart.id}-{int(timezone.now().timestamp())}"
+                child_host = Host.objects.create(
+                    hostname=hostname,
+                    device_model=sparepart.model,
+                    sn=sparepart.serial_number,
+                    ip='0.0.0.0',
+                    memo=sparepart.name,
+                    asset_no=sparepart.asset_code,
+                    images=sparepart.images
+                )
+
+                # 创建资产关系，标记为已退库
+                relation = AssetRelation.objects.create(
+                    parent_asset=child_host,
+                    child_asset=child_host,
+                    slot=sparepart.location,
+                    is_removable=True,
+                    is_active=False,
+                    is_returned=True,
+                    returned_at=timezone.now()
+                )
+
+                # 记录操作日志
+                log_operation(request.user, 'update', f'备件退库: {sparepart.name}', '备件退库操作', request.META.get('REMOTE_ADDR'))
+
+                # 删除备件记录
+                sparepart.delete()
+
+                return JsonResponse({'success': True, 'message': '备件退库成功'})
+        except SparePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '备件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
 def api_direct_install_component(request):
     """直接安装新组件（未经过备件库）"""
     if request.method == 'POST':

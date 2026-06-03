@@ -54,6 +54,7 @@
                 <td>
                     <button class="btn btn-sm btn-edit" onclick="openEditModal({{ part.id }})">编辑</button>
                     <button class="btn btn-sm btn-install" onclick="openInstallModal({{ part.id }})">安装</button>
+                    <button class="btn btn-sm btn-return" onclick="openReturnModal({{ part.id }})">退库</button>
                     <button class="btn btn-sm btn-delete" onclick="deleteSparePart({{ part.id }})">删除</button>
                 </td>
             </tr>
@@ -215,6 +216,35 @@
 </div>
 
 <!-- 编辑备件弹窗 -->
+<!-- 退库备件弹窗 -->
+<div class="modal fade" id="returnModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">备件退库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="returnForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="sparepart_id" id="return_sparepart_id">
+                    <div class="mb-3">
+                        <label class="form-label">退库原因</label>
+                        <textarea class="form-control" name="return_reason" rows="3" placeholder="请输入退库原因（可选）"></textarea>
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>注意：</strong>退库后该备件将从备件库移除，转移到已退库设备列表中。
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" onclick="submitReturnForm()">确认退库</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -690,6 +720,36 @@ document.getElementById('editForm').addEventListener('submit', function(e) {
         }
     });
 });
+
+// 打开退库弹窗
+function openReturnModal(id) {
+    document.getElementById('return_sparepart_id').value = id;
+    document.getElementById('returnForm').reset();
+    new bootstrap.Modal(document.getElementById('returnModal')).show();
+}
+
+// 提交退库表单
+function submitReturnForm() {
+    var form = document.getElementById('returnForm');
+    var formData = new FormData(form);
+    
+    fetch('{% url 'api_return_sparepart' %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('退库成功，备件已转移到已退库设备列表');
+            location.reload();
+        } else {
+            alert(data.error || '退库失败');
+        }
+    });
+}
 
 // 初始化可搜索下拉框
 document.addEventListener('DOMContentLoaded', function() {

@@ -152,6 +152,7 @@ urlpatterns = [
     path('api/uninstall_component/', views.api_uninstall_component, name='api_uninstall_component'),
     path('api/install_history/<int:relation_id>/', views.api_get_install_history, name='api_get_install_history'),
     path('api/install_sparepart/', views.api_install_sparepart, name='api_install_sparepart'),
+    path('api/return_sparepart/', views.api_return_sparepart, name='api_return_sparepart'),
     path('api/get_relation_detail/', views.api_get_relation_detail, name='api_get_relation_detail'),
     path('api/edit_relation/', views.api_edit_relation, name='api_edit_relation'),
     path('api/remove_relation/', views.api_remove_relation, name='api_remove_relation'),
