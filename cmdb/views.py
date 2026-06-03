@@ -4862,12 +4862,12 @@ def api_return_sparepart(request):
             with transaction.atomic():
                 sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
                 
-                # 创建子资产Host记录
-                hostname = f"returned-sparepart-{sparepart.id}-{int(timezone.now().timestamp())}"
+                # 创建子资产Host记录（存储备件信息）
+                child_hostname = f"returned-sparepart-{sparepart.id}-{int(timezone.now().timestamp())}"
                 # 保存备件类型名称（用于后续恢复）
                 sparepart_type_name = sparepart.type.name if sparepart.type else ''
                 child_host = Host.objects.create(
-                    hostname=hostname,
+                    hostname=child_hostname,
                     device_model=sparepart.model,
                     sn=sparepart.serial_number,
                     ip='0.0.0.0',
@@ -4875,13 +4875,28 @@ def api_return_sparepart(request):
                     asset_no=sparepart.asset_code,
                     images=sparepart.images,
                     brand=sparepart.brand,
-                    disk=sparepart.size,  # 将备件大小存储到disk字段
-                    asset_type=sparepart_type_name  # 存储备件类型名称
+                    disk=sparepart.size,
+                    asset_type=sparepart_type_name
+                )
+
+                # 创建父资产Host记录（用于显示原主资产编号，为空表示无主资产）
+                parent_hostname = f"parent-{child_hostname}"
+                parent_host = Host.objects.create(
+                    hostname=parent_hostname,
+                    device_model='',
+                    sn='',
+                    ip='0.0.0.0',
+                    memo='备件退库（无主资产）',
+                    asset_no='',  # 原主资产编号为空
+                    images='',
+                    brand='',
+                    disk='',
+                    asset_type=''
                 )
 
                 # 创建资产关系，标记为已退库
                 relation = AssetRelation.objects.create(
-                    parent_asset=child_host,
+                    parent_asset=parent_host,
                     child_asset=child_host,
                     slot=sparepart.location,
                     is_removable=True,
@@ -5373,6 +5388,11 @@ def api_add_to_spareparts(request):
                 relation.is_returned = True
                 relation.returned_at = timezone.now()
                 relation.save()
+                
+                # 如果父资产和子资产不同（备件退库时创建的独立父资产），删除父资产记录
+                parent_asset = relation.parent_asset
+                if parent_asset.id != child_asset.id:
+                    parent_asset.delete()
                 
                 # 添加生命周期事件
                 LifecycleEvent.objects.create(
