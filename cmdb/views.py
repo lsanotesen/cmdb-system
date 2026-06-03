@@ -4864,6 +4864,8 @@ def api_return_sparepart(request):
                 
                 # 创建子资产Host记录
                 hostname = f"returned-sparepart-{sparepart.id}-{int(timezone.now().timestamp())}"
+                # 保存备件类型名称（用于后续恢复）
+                sparepart_type_name = sparepart.type.name if sparepart.type else ''
                 child_host = Host.objects.create(
                     hostname=hostname,
                     device_model=sparepart.model,
@@ -4873,7 +4875,8 @@ def api_return_sparepart(request):
                     asset_no=sparepart.asset_code,
                     images=sparepart.images,
                     brand=sparepart.brand,
-                    disk=sparepart.size  # 将备件大小存储到disk字段
+                    disk=sparepart.size,  # 将备件大小存储到disk字段
+                    asset_type=sparepart_type_name  # 存储备件类型名称
                 )
 
                 # 创建资产关系，标记为已退库
@@ -5342,6 +5345,13 @@ def api_add_to_spareparts(request):
                     if match:
                         size_info = f"{match.group(1)}{match.group(2)}"
                 
+                # 尝试恢复备件类型
+                sparepart_type = None
+                if child_asset.asset_type:
+                    # 尝试查找现有的备件类型（使用first处理可能存在多个同名类型的情况）
+                    from cmdb.models import SparePartType
+                    sparepart_type = SparePartType.objects.filter(name=child_asset.asset_type).first()
+                
                 sparepart = SparePart.objects.create(
                     asset_code=child_asset.asset_no or '',
                     name=child_asset.memo or child_asset.hostname,
@@ -5352,6 +5362,7 @@ def api_add_to_spareparts(request):
                     status=mapped_status,
                     location=relation.slot or '',
                     images=child_asset.images or '',
+                    type=sparepart_type,  # 关联备件类型
                     is_installed=False,
                     installed_host_id=None,
                     installed_slot='',
