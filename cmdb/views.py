@@ -4871,7 +4871,9 @@ def api_return_sparepart(request):
                     ip='0.0.0.0',
                     memo=sparepart.name,
                     asset_no=sparepart.asset_code,
-                    images=sparepart.images
+                    images=sparepart.images,
+                    brand=sparepart.brand,
+                    disk=sparepart.size  # 将备件大小存储到disk字段
                 )
 
                 # 创建资产关系，标记为已退库
