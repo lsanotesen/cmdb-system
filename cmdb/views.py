@@ -5332,13 +5332,15 @@ def api_add_to_spareparts(request):
                 
                 # 创建备件记录
                 sparepart = SparePart.objects.create(
+                    asset_code=child_asset.asset_no or '',
                     name=child_asset.memo or child_asset.hostname,
                     brand='',
                     model=child_asset.device_model or '',
                     serial_number=child_asset.sn or '',
                     size='',
                     status=mapped_status,
-                    location='',
+                    location=relation.slot or '',
+                    images=child_asset.images or '',
                     is_installed=False,
                     installed_host_id=None,
                     installed_slot='',
