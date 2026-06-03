@@ -5331,13 +5331,22 @@ def api_add_to_spareparts(request):
                     return JsonResponse({'success': False, 'error': '该设备已经添加到备件库，请勿重复添加'})
                 
                 # 创建备件记录
+                # 尝试从disk字段提取大小信息（格式如 "300GB"）
+                size_info = ''
+                if child_asset.disk:
+                    # 尝试提取数字+单位的模式
+                    import re
+                    match = re.search(r'(\d+)\s*([GTM]B)', child_asset.disk, re.IGNORECASE)
+                    if match:
+                        size_info = f"{match.group(1)}{match.group(2)}"
+                
                 sparepart = SparePart.objects.create(
                     asset_code=child_asset.asset_no or '',
                     name=child_asset.memo or child_asset.hostname,
-                    brand='',
+                    brand=child_asset.brand or '',
                     model=child_asset.device_model or '',
                     serial_number=child_asset.sn or '',
-                    size='',
+                    size=size_info,
                     status=mapped_status,
                     location=relation.slot or '',
                     images=child_asset.images or '',
