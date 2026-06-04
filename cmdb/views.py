@@ -4469,6 +4469,7 @@ def export_spareparts_excel(request):
         import io
         from openpyxl import Workbook
         from datetime import datetime
+        from django.db.models import Q
         
         # 获取过滤参数
         keyword = request.GET.get('keyword', '')
