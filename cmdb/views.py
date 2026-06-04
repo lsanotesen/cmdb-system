@@ -4603,7 +4603,7 @@ def export_office_parts_excel(request):
         status_map = {
             'new': '全新',
             'in_stock': '在库',
-            'used': '拆机良品',
+            'used': '在库',
             'installed': '使用中',
             'pending': '待检测',
             'faulty': '故障',
