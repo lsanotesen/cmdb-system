@@ -440,6 +440,7 @@ class OfficePart(models.Model):
     category = models.CharField('配件分类', max_length=20, choices=CATEGORY_CHOICES, default='other')
     brand = models.CharField('品牌', max_length=100, blank=True)
     model = models.CharField('型号', max_length=100, blank=True)
+    size = models.CharField('大小/规格', max_length=100, blank=True, help_text='如: 500GB, 8GB DDR4')
     asset_number = models.CharField('资产编号', max_length=100, blank=True, unique=True, null=True)
     serial_number = models.CharField('SN', max_length=100, blank=True, unique=True, null=True)
     source_computer = models.CharField('来源办公电脑', max_length=200, blank=True, help_text='如: PC-2024-001')

@@ -4578,7 +4578,7 @@ def export_office_parts_excel(request):
         ws.title = '办公机配件列表'
         
         # 添加表头
-        headers = ['序号', '资产编号', '名称', '分类', '品牌', '型号', 'SN码', '来源办公电脑', '拆机时间', '存放位置', '购买日期', '状态', '备注']
+        headers = ['序号', '资产编号', '名称', '分类', '品牌', '型号', '大小/规格', 'SN码', '来源办公电脑', '拆机时间', '存放位置', '购买日期', '状态', '备注']
         ws.append(headers)
         
         # 获取办公机配件数据（排除已退库）
@@ -4623,6 +4623,7 @@ def export_office_parts_excel(request):
                 category_map.get(part.category, part.category),
                 part.brand or '',
                 part.model or '',
+                part.size or '',
                 part.serial_number or '',
                 part.source_computer or '',
                 part.dismantle_date.strftime('%Y-%m-%d') if part.dismantle_date else '',
@@ -5932,6 +5933,7 @@ def office_part_import(request):
                 '分类': None,
                 '品牌': None,
                 '型号': None,
+                '大小/规格': None,
                 'SN码': None,
                 '来源办公电脑': None,
                 '拆机时间': None,
@@ -5984,6 +5986,10 @@ def office_part_import(request):
                     # 型号
                     if col_map['型号'] is not None and row[col_map['型号']]:
                         part.model = str(row[col_map['型号']])
+                    
+                    # 大小/规格
+                    if col_map['大小/规格'] is not None and row[col_map['大小/规格']]:
+                        part.size = str(row[col_map['大小/规格']])
                     
                     # SN码
                     if col_map['SN码'] is not None and row[col_map['SN码']]:
@@ -6054,6 +6060,7 @@ def office_part_add(request):
             part.category = request.POST.get('category', 'other')
             part.brand = request.POST.get('brand', '')
             part.model = request.POST.get('model', '')
+            part.size = request.POST.get('size', '')
             part.asset_number = request.POST.get('asset_number') or None
             part.serial_number = request.POST.get('serial_number') or None
             part.source_computer = request.POST.get('source_computer', '')
@@ -6104,6 +6111,7 @@ def office_part_edit(request, part_id):
                     'category': part.category,
                     'brand': part.brand,
                     'model': part.model,
+                    'size': part.size,
                     'asset_number': part.asset_number or '',
                     'serial_number': part.serial_number or '',
                     'source_computer': part.source_computer,
@@ -6124,6 +6132,7 @@ def office_part_edit(request, part_id):
             part.category = request.POST.get('category', 'other')
             part.brand = request.POST.get('brand', '')
             part.model = request.POST.get('model', '')
+            part.size = request.POST.get('size', '')
             part.asset_number = request.POST.get('asset_number') or None
             part.serial_number = request.POST.get('serial_number') or None
             part.source_computer = request.POST.get('source_computer', '')

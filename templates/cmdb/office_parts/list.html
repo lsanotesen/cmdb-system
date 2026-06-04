@@ -69,6 +69,7 @@
                 <th>分类</th>
                 <th>品牌</th>
                 <th>型号</th>
+                <th>大小/规格</th>
                 <th>SN</th>
                 <th>存放位置</th>
                 <th>拆机时间</th>
@@ -104,6 +105,7 @@
                     </td>
                     <td>{{ part.brand|default:"-" }}</td>
                     <td>{{ part.model|default:"-" }}</td>
+                    <td>{{ part.size|default:"-" }}</td>
                     <td>{{ part.serial_number|default:"-" }}</td>
                     <td>{{ part.location|default:"-" }}</td>
                     <td>{{ part.dismantle_date|date:"Y-m-d"|default:"-" }}</td>
@@ -182,6 +184,10 @@
                         <div class="form-group">
                             <label>型号</label>
                             <input type="text" name="model" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>大小/规格</label>
+                            <input type="text" name="size" class="form-control" placeholder="如: 500GB, 8GB DDR4">
                         </div>
                     </div>
                     <div class="form-row">
@@ -360,6 +366,10 @@
                         <div class="form-group">
                             <label>型号</label>
                             <input type="text" name="model" id="edit_model" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>大小/规格</label>
+                            <input type="text" name="size" id="edit_size" class="form-control" placeholder="如: 500GB, 8GB DDR4">
                         </div>
                     </div>
                     <div class="form-row">
@@ -541,6 +551,7 @@ function openEditModal(partId) {
             document.getElementById('edit_category').value = part.category;
             document.getElementById('edit_brand').value = part.brand;
             document.getElementById('edit_model').value = part.model;
+            document.getElementById('edit_size').value = part.size;
             document.getElementById('edit_asset_number').value = part.asset_number;
             document.getElementById('edit_serial_number').value = part.serial_number;
             document.getElementById('edit_source_computer').value = part.source_computer;
