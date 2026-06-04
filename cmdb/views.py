@@ -4485,7 +4485,6 @@ def export_spareparts_excel(request):
         
         # 获取服务器备件数据
         spareparts = SparePart.objects.filter(
-            category='server',
             status__in=['in_stock', 'maintenance', 'available', '']
         )
         
