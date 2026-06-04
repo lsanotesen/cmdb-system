@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}导入办公机配件{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>📥 导入办公机配件</h2>
+        <a href="{% url 'office_parts_list' %}" class="btn">← 返回列表</a>
+    </div>
+    <div class="card-body">
+        <div class="import-instructions">
+            <h4>导入说明</h4>
+            <p>请上传 Excel 文件（.xlsx 或 .xls 格式）来批量导入办公机配件数据。</p>
+            
+            <h5>Excel 文件格式要求：</h5>
+            <table class="table table-bordered" style="width: auto;">
+                <thead>
+                    <tr>
+                        <th>列名</th>
+                        <th>说明</th>
+                        <th>是否必填</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>资产编号</td><td>配件的资产编号</td><td>否</td></tr>
+                    <tr><td>名称</td><td>配件名称（如：硬盘、内存条）</td><td><strong>是</strong></td></tr>
+                    <tr><td>分类</td><td>配件分类（如：硬盘、内存、电源、风扇、主板、CPU、网卡、其他）</td><td>否</td></tr>
+                    <tr><td>品牌</td><td>配件品牌</td><td>否</td></tr>
+                    <tr><td>型号</td><td>配件型号</td><td>否</td></tr>
+                    <tr><td>SN码</td><td>序列号</td><td>否</td></tr>
+                    <tr><td>来源办公电脑</td><td>来源的办公电脑编号</td><td>否</td></tr>
+                    <tr><td>拆机时间</td><td>拆机日期（格式：YYYY-MM-DD）</td><td>否</td></tr>
+                    <tr><td>存放位置</td><td>配件存放位置</td><td>否</td></tr>
+                    <tr><td>购买日期</td><td>购买日期（格式：YYYY-MM-DD）</td><td>否</td></tr>
+                    <tr><td>备注</td><td>备注信息</td><td>否</td></tr>
+                </tbody>
+            </table>
+            
+            <h5>注意事项：</h5>
+            <ul>
+                <li>Excel 文件第一行必须为表头行</li>
+                <li>"名称" 列为必填项，其他列可选</li>
+                <li>导入时状态默认设为"在库"</li>
+                <li>SN码如果有重复会自动跳过</li>
+            </ul>
+            
+            <h5>下载模板：</h5>
+            <a href="{% url 'export_office_parts_excel' %}" class="btn">📥 下载导入模板</a>
+        </div>
+        
+        <hr>
+        
+        <form method="post" enctype="multipart/form-data" action="{% url 'office_part_import' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="file">选择 Excel 文件：</label>
+                <input type="file" name="file" id="file" accept=".xlsx,.xls" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-success">📤 开始导入</button>
+        </form>
+        
+        {% if messages %}
+        <div class="mt-3">
+            {% for message in messages %}
+            <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'warning' %}alert-warning{% else %}alert-success{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.import-instructions {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+.import-instructions h4 {
+    margin-top: 0;
+    color: #333;
+}
+.import-instructions h5 {
+    margin-top: 20px;
+    color: #555;
+}
+.table {
+    margin: 10px 0;
+}
+.table th {
+    background: #e9ecef;
+}
+</style>
+{% endblock %}

@@ -4463,6 +4463,208 @@ def spareparts_edit(request, sparepart_id):
     })
 
 @login_required
+def export_spareparts_excel(request):
+    """导出服务器备件Excel"""
+    try:
+        import io
+        from openpyxl import Workbook
+        from datetime import datetime
+        
+        # 获取过滤参数
+        keyword = request.GET.get('keyword', '')
+        
+        # 创建工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = '服务器备件列表'
+        
+        # 添加表头
+        headers = ['序号', '备件资产编号', '名称', '品牌', '型号', '大小/规格', '序列号', '存放位置', '购买日期', '类型', '状态']
+        ws.append(headers)
+        
+        # 获取服务器备件数据
+        spareparts = SparePart.objects.filter(
+            category='server',
+            status__in=['in_stock', 'maintenance', 'available', '']
+        )
+        
+        # 应用过滤条件
+        if keyword:
+            spareparts = spareparts.filter(
+                Q(name__icontains=keyword) |
+                Q(brand__icontains=keyword) |
+                Q(model__icontains=keyword) |
+                Q(serial_number__icontains=keyword) |
+                Q(asset_code__icontains=keyword)
+            )
+        
+        for idx, sparepart in enumerate(spareparts, 1):
+            # 获取类型名称
+            part_type = sparepart.type.name if sparepart.type else ''
+            
+            # 状态映射
+            status_map = {
+                'in_stock': '库存中',
+                'maintenance': '维修中',
+                'available': '可用',
+                'installed': '已安装',
+                'scrapped': '已报废',
+            }
+            status_display = status_map.get(sparepart.status, sparepart.status)
+            
+            row = [
+                idx,
+                sparepart.asset_code or '',
+                sparepart.name or '',
+                sparepart.brand or '',
+                sparepart.model or '',
+                sparepart.size or '',
+                sparepart.serial_number or '',
+                sparepart.location or '',
+                sparepart.purchase_date.strftime('%Y-%m-%d') if sparepart.purchase_date else '',
+                part_type,
+                status_display
+            ]
+            ws.append(row)
+        
+        # 调整列宽
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 保存到内存
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # 生成带时间戳的文件名
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f'spareparts_export_{timestamp}.xlsx'
+        
+        # 设置响应头
+        response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        log_operation(request.user, 'export', '服务器备件', '导出服务器备件Excel', request.META.get('REMOTE_ADDR'))
+        
+        return response
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'导出失败: {str(e)}'}, json_dumps_params={'ensure_ascii': False})
+
+@login_required
+def export_office_parts_excel(request):
+    """导出办公机配件Excel"""
+    try:
+        import io
+        from openpyxl import Workbook
+        from datetime import datetime
+        
+        # 获取过滤参数
+        keyword = request.GET.get('keyword', '')
+        status_filter = request.GET.get('status', '')
+        
+        # 创建工作簿
+        wb = Workbook()
+        ws = wb.active
+        ws.title = '办公机配件列表'
+        
+        # 添加表头
+        headers = ['序号', '资产编号', '名称', '分类', '品牌', '型号', 'SN码', '来源办公电脑', '拆机时间', '存放位置', '购买日期', '状态', '备注']
+        ws.append(headers)
+        
+        # 获取办公机配件数据（排除已退库）
+        parts = OfficePart.objects.exclude(status='returned')
+        
+        # 应用过滤条件
+        if keyword:
+            parts = parts.filter(
+                Q(name__icontains=keyword) |
+                Q(brand__icontains=keyword) |
+                Q(model__icontains=keyword) |
+                Q(serial_number__icontains=keyword) |
+                Q(source_computer__icontains=keyword)
+            )
+        
+        if status_filter:
+            if status_filter == 'in_stock':
+                parts = parts.filter(status__in=['in_stock', 'used'])
+            else:
+                parts = parts.filter(status=status_filter)
+        
+        # 状态映射
+        status_map = {
+            'new': '全新',
+            'in_stock': '在库',
+            'used': '拆机良品',
+            'installed': '使用中',
+            'pending': '待检测',
+            'faulty': '故障',
+            'retired': '待报废',
+            'returned': '已退库',
+        }
+        
+        # 分类映射
+        category_map = dict(OfficePart.CATEGORY_CHOICES)
+        
+        for idx, part in enumerate(parts, 1):
+            row = [
+                idx,
+                part.asset_number or '',
+                part.name or '',
+                category_map.get(part.category, part.category),
+                part.brand or '',
+                part.model or '',
+                part.serial_number or '',
+                part.source_computer or '',
+                part.dismantle_date.strftime('%Y-%m-%d') if part.dismantle_date else '',
+                part.location or '',
+                part.purchase_date.strftime('%Y-%m-%d') if part.purchase_date else '',
+                status_map.get(part.status, part.status),
+                part.remark or ''
+            ]
+            ws.append(row)
+        
+        # 调整列宽
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # 保存到内存
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        # 生成带时间戳的文件名
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        filename = f'office_parts_export_{timestamp}.xlsx'
+        
+        # 设置响应头
+        response = HttpResponse(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        log_operation(request.user, 'export', '办公机配件', '导出办公机配件Excel', request.META.get('REMOTE_ADDR'))
+        
+        return response
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'导出失败: {str(e)}'}, json_dumps_params={'ensure_ascii': False})
+
+@login_required
 def spareparts_delete(request, sparepart_id):
     """删除备件"""
     if request.method == 'POST':
@@ -5694,6 +5896,151 @@ def office_parts_list(request):
         'today': timezone.now().strftime('%Y-%m-%d'),
     }
     return render(request, 'cmdb/office_parts/list.html', context)
+
+
+@login_required
+def office_part_import(request):
+    """导入办公机配件"""
+    if request.method == 'POST':
+        if 'file' not in request.FILES:
+            messages.error(request, '请选择要导入的Excel文件')
+            return redirect('office_part_import')
+        
+        file = request.FILES['file']
+        
+        # 检查文件类型
+        if not file.name.endswith(('.xlsx', '.xls')):
+            messages.error(request, '请上传Excel文件（.xlsx 或 .xls格式）')
+            return redirect('office_part_import')
+        
+        # 读取Excel文件
+        import openpyxl
+        from io import BytesIO
+        
+        try:
+            wb = openpyxl.load_workbook(BytesIO(file.read()))
+            ws = wb.active
+            
+            # 获取表头
+            headers = [str(cell.value).strip() if cell.value else '' for cell in ws[1]]
+            
+            # 定义列索引映射
+            col_map = {
+                '资产编号': None,
+                '名称': None,
+                '分类': None,
+                '品牌': None,
+                '型号': None,
+                'SN码': None,
+                '来源办公电脑': None,
+                '拆机时间': None,
+                '存放位置': None,
+                '购买日期': None,
+                '备注': None,
+            }
+            
+            for idx, header in enumerate(headers):
+                if header in col_map:
+                    col_map[header] = idx
+            
+            # 验证必要的列
+            if col_map['名称'] is None:
+                messages.error(request, 'Excel文件中缺少"名称"列')
+                return redirect('office_part_import')
+            
+            # 导入数据
+            imported_count = 0
+            error_count = 0
+            errors = []
+            
+            from datetime import datetime
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+                try:
+                    # 获取名称（必填）
+                    name = row[col_map['名称']] if col_map['名称'] is not None else None
+                    if not name:
+                        continue  # 跳过空行
+                    
+                    # 创建配件
+                    part = OfficePart()
+                    part.name = str(name)
+                    
+                    # 资产编号
+                    if col_map['资产编号'] is not None and row[col_map['资产编号']]:
+                        part.asset_number = str(row[col_map['资产编号']])
+                    
+                    # 分类
+                    if col_map['分类'] is not None and row[col_map['分类']]:
+                        category_value = str(row[col_map['分类']])
+                        category_map = {v: k for k, v in OfficePart.CATEGORY_CHOICES}
+                        part.category = category_map.get(category_value, 'other')
+                    
+                    # 品牌
+                    if col_map['品牌'] is not None and row[col_map['品牌']]:
+                        part.brand = str(row[col_map['品牌']])
+                    
+                    # 型号
+                    if col_map['型号'] is not None and row[col_map['型号']]:
+                        part.model = str(row[col_map['型号']])
+                    
+                    # SN码
+                    if col_map['SN码'] is not None and row[col_map['SN码']]:
+                        part.serial_number = str(row[col_map['SN码']])
+                    
+                    # 来源办公电脑
+                    if col_map['来源办公电脑'] is not None and row[col_map['来源办公电脑']]:
+                        part.source_computer = str(row[col_map['来源办公电脑']])
+                    
+                    # 拆机时间
+                    if col_map['拆机时间'] is not None and row[col_map['拆机时间']]:
+                        try:
+                            if isinstance(row[col_map['拆机时间']], datetime):
+                                part.dismantle_date = row[col_map['拆机时间']].date()
+                            else:
+                                part.dismantle_date = datetime.strptime(str(row[col_map['拆机时间']]), '%Y-%m-%d').date()
+                        except:
+                            pass
+                    
+                    # 存放位置
+                    if col_map['存放位置'] is not None and row[col_map['存放位置']]:
+                        part.location = str(row[col_map['存放位置']])
+                    
+                    # 购买日期
+                    if col_map['购买日期'] is not None and row[col_map['购买日期']]:
+                        try:
+                            if isinstance(row[col_map['购买日期']], datetime):
+                                part.purchase_date = row[col_map['购买日期']].date()
+                            else:
+                                part.purchase_date = datetime.strptime(str(row[col_map['购买日期']]), '%Y-%m-%d').date()
+                        except:
+                            pass
+                    
+                    # 备注
+                    if col_map['备注'] is not None and row[col_map['备注']]:
+                        part.remark = str(row[col_map['备注']])
+                    
+                    part.status = 'in_stock'  # 默认状态为在库
+                    part.save()
+                    imported_count += 1
+                    
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f'第{row_idx}行: {str(e)}')
+            
+            log_operation(request.user, 'import', '办公机配件', f'导入办公机配件{imported_count}条', request.META.get('REMOTE_ADDR'))
+            
+            messages.success(request, f'成功导入{imported_count}条记录')
+            if error_count > 0:
+                messages.warning(request, f'失败{error_count}条: {"; ".join(errors[:5])}')
+            
+            return redirect('office_parts_list')
+            
+        except Exception as e:
+            messages.error(request, f'导入失败: {str(e)}')
+            return redirect('office_part_import')
+    
+    return render(request, 'cmdb/office_parts/import.html')
 
 
 @login_required

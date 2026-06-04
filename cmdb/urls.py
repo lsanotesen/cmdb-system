@@ -114,6 +114,8 @@ urlpatterns = [
     # 办公机配件管理
     path('office_parts/', views.office_parts_list, name='office_parts_list'),
     path('office_parts/add/', views.office_part_add, name='office_part_add'),
+    path('office_parts/import/', views.office_part_import, name='office_part_import'),
+    path('office_parts/export/', views.export_office_parts_excel, name='export_office_parts_excel'),
     path('office_parts/<int:part_id>/edit/', views.office_part_edit, name='office_part_edit'),
     path('office_parts/<int:part_id>/delete/', views.office_part_delete, name='office_part_delete'),
     path('office_parts/batch_delete/', views.office_part_batch_delete, name='office_part_batch_delete'),
@@ -132,6 +134,7 @@ urlpatterns = [
     path('spareparts/server/', views.server_spareparts_list, name='server_spareparts_list'),
     path('spareparts/desktop/', views.desktop_spareparts_list, name='desktop_spareparts_list'),
     path('spareparts/add/', views.spareparts_add, name='spareparts_add'),
+    path('spareparts/export/', views.export_spareparts_excel, name='export_spareparts_excel'),
     path('spareparts/<int:sparepart_id>/edit/', views.spareparts_edit, name='spareparts_edit'),
     path('spareparts/<int:sparepart_id>/delete/', views.spareparts_delete, name='spareparts_delete'),
     
