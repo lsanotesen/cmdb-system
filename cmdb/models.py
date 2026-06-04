@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
 import json
 import ast
 
@@ -428,10 +429,9 @@ class OfficePart(models.Model):
     
     STATUS_CHOICES = [
         ('new', '全新'),
+        ('in_stock', '在库'),
         ('used', '拆机良品'),
-        ('in_stock', '闲置库存'),
-        ('installed', '使用中'),
-        ('pending', '待检测'),
+        ('returned', '已退库'),
         ('faulty', '故障'),
         ('retired', '待报废'),
     ]
@@ -440,9 +440,14 @@ class OfficePart(models.Model):
     category = models.CharField('配件分类', max_length=20, choices=CATEGORY_CHOICES, default='other')
     brand = models.CharField('品牌', max_length=100, blank=True)
     model = models.CharField('型号', max_length=100, blank=True)
+    asset_number = models.CharField('资产编号', max_length=100, blank=True, unique=True, null=True)
     serial_number = models.CharField('SN', max_length=100, blank=True, unique=True, null=True)
     source_computer = models.CharField('来源办公电脑', max_length=200, blank=True, help_text='如: PC-2024-001')
     status = models.CharField('当前状态', max_length=20, choices=STATUS_CHOICES, default='in_stock')
+    
+    def get_status_display(self):
+        status_map = dict(self.STATUS_CHOICES)
+        return status_map.get(self.status, self.status)
     dismantle_date = models.DateField('拆机时间', blank=True, null=True)
     location = models.CharField('存放位置', max_length=200, blank=True)
     purchase_date = models.DateField('购买日期', blank=True, null=True)
@@ -466,6 +471,89 @@ class OfficePart(models.Model):
     class Meta:
         verbose_name = '办公机配件'
         verbose_name_plural = '办公机配件管理'
+        ordering = ['-created_at']
+
+
+class OfficePartFlow(models.Model):
+    """办公机配件流转记录模型"""
+    
+    FLOW_TYPE_CHOICES = [
+        ('in', '入库'),
+        ('issue', '发放'),
+        ('return', '退库'),
+        ('reissue', '再次发放'),
+    ]
+    
+    RETURN_REASON_CHOICES = [
+        ('damaged', '损坏'),
+        ('replacement', '更换'),
+        ('normal_return', '正常归还'),
+    ]
+    
+    part = models.ForeignKey('OfficePart', verbose_name='关联配件', on_delete=models.CASCADE, related_name='flows')
+    flow_type = models.CharField('流转类型', max_length=20, choices=FLOW_TYPE_CHOICES)
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='操作人', on_delete=models.SET_NULL, null=True, blank=True)
+    operator_name = models.CharField('操作人姓名', max_length=100, blank=True)
+    recipient = models.CharField('领用人', max_length=100, blank=True)
+    department = models.CharField('所属部门', max_length=100, blank=True)
+    return_reason = models.CharField('退库原因', max_length=20, choices=RETURN_REASON_CHOICES, blank=True)
+    health_check = models.IntegerField('硬盘健康度(%)', blank=True, null=True)
+    location = models.CharField('仓库位置', max_length=200, blank=True)
+    remark = models.TextField('备注', blank=True)
+    created_at = models.DateTimeField('操作时间', auto_now_add=True)
+    
+    def __str__(self):
+        return f'{self.part.name} - {self.get_flow_type_display()} - {self.created_at}'
+    
+    class Meta:
+        verbose_name = '配件流转记录'
+        verbose_name_plural = '配件流转记录管理'
+        ordering = ['created_at']
+
+
+class OfficePartReturnOrder(models.Model):
+    """办公机配件退库单模型"""
+    
+    RETURN_REASON_CHOICES = [
+        ('damaged', '损坏'),
+        ('replacement', '更换'),
+        ('normal_return', '正常归还'),
+    ]
+    
+    RETURN_STATUS_CHOICES = [
+        ('pending', '待审核'),
+        ('approved', '已入库'),
+        ('rejected', '已拒绝'),
+    ]
+    
+    order_no = models.CharField('退库单号', max_length=50, unique=True)
+    part = models.ForeignKey('OfficePart', verbose_name='关联配件', on_delete=models.CASCADE)
+    return_person = models.CharField('退库人', max_length=100)
+    return_date = models.DateField('退库日期')
+    return_reason = models.CharField('退库原因', max_length=20, choices=RETURN_REASON_CHOICES)
+    health_check = models.IntegerField('硬盘健康度(%)', blank=True, null=True)
+    status = models.CharField('处理状态', max_length=20, choices=RETURN_STATUS_CHOICES, default='pending')
+    approver = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name='审核人', on_delete=models.SET_NULL, null=True, blank=True, related_name='office_part_return_orders')
+    approved_at = models.DateTimeField('审核时间', null=True, blank=True)
+    reject_reason = models.TextField('驳回原因', blank=True)
+    remark = models.TextField('备注', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+    
+    def __str__(self):
+        return f'{self.order_no} - {self.part.name}'
+    
+    def get_status_display(self):
+        status_map = dict(self.RETURN_STATUS_CHOICES)
+        return status_map.get(self.status, self.status)
+    
+    def get_return_reason_display(self):
+        reason_map = dict(self.RETURN_REASON_CHOICES)
+        return reason_map.get(self.return_reason, self.return_reason)
+    
+    class Meta:
+        verbose_name = '配件退库单'
+        verbose_name_plural = '配件退库单管理'
         ordering = ['-created_at']
 
 

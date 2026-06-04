@@ -24,6 +24,11 @@
                     <button class="btn btn-primary float-right" onclick="showAddModal()">添加备件</button>
                 </div>
                 <div class="card-body">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+                        <div style="font-size: 14px; color: #666;">
+                            共 <span style="font-weight: 600; color: #1a1a1a;">{{ spareparts|length }}</span> 条可用备件
+                        </div>
+                    </div>
                     <table class="table table-striped">
                         <thead>
                             <tr>

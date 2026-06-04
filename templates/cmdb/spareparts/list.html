@@ -11,6 +11,26 @@
     </div>
     <div class="card-body">
 
+        <!-- 搜索和筛选 -->
+        <div class="search-box" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
+            <div style="flex: 1; min-width: 200px; max-width: 250px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px; color: #666; white-space: nowrap;">关键词:</span>
+                    <input type="text" id="keywordInput" class="form-control" style="flex: 1; font-size: 13px; padding: 4px 8px;" value="{{ search_keyword }}" placeholder="搜索...">
+                </div>
+            </div>
+            <div style="flex: 0 0 auto; display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="applyFilters()">筛选</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">重置</button>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 14px; color: #666;">
+                共 <span style="font-weight: 600; color: #1a1a1a;">{{ spareparts|length }}</span> 条服务器备件
+            </div>
+        </div>
+
 <div class="table-container">
     <table class="data-table">
         <thead>
@@ -359,6 +379,21 @@
 }
 </style>
 <script>
+// 筛选
+function applyFilters() {
+    var keyword = document.getElementById('keywordInput').value;
+    var url = window.location.pathname + '?';
+    var params = [];
+    if (keyword) params.push('keyword=' + encodeURIComponent(keyword));
+    location.href = url + params.join('&');
+}
+
+// 重置
+function clearFilters() {
+    document.getElementById('keywordInput').value = '';
+    location.href = window.location.pathname;
+}
+
 // 打开图片预览弹窗
 function openImagePreview(src) {
     document.getElementById('previewImage').src = src;

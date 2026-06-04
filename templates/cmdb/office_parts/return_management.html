@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+
+{% block title %}配件退库管理{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>配件退库管理</h2>
+    </div>
+    <div class="card-body">
+        <!-- 搜索和筛选 -->
+        <div class="search-box" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;">
+            <div style="flex: 1; min-width: 200px; max-width: 250px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 13px; color: #666; white-space: nowrap;">关键词:</span>
+                    <input type="text" id="keywordInput" class="form-control" style="flex: 1; font-size: 13px; padding: 4px 8px;" value="{{ search_query }}" placeholder="搜索...">
+                </div>
+            </div>
+            <div style="flex: 0 0 auto; display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="applyFilters()">筛选</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">重置</button>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 14px; color: #666;">
+                共 <span style="font-weight: 600; color: #1a1a1a;">{{ flow_records|length }}</span> 条退库记录
+            </div>
+        </div>
+
+        <!-- 退库记录列表 -->
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 60px;">序号</th>
+                    <th>资产编号</th>
+                    <th>配件名称</th>
+                    <th>SN码</th>
+                    <th>品牌/型号</th>
+                    <th>退库日期</th>
+                    <th>退库人</th>
+                    <th>退库原因</th>
+                    <th>备注</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for flow in flow_records %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ flow.part.asset_number|default:"-" }}</td>
+                    <td>{{ flow.part.name }}</td>
+                    <td>{{ flow.part.serial_number|default:"-" }}</td>
+                    <td>{{ flow.part.brand|default:"-" }} / {{ flow.part.model|default:"-" }}</td>
+                    <td>{{ flow.created_at|date:"Y-m-d" }}</td>
+                    <td>{{ flow.recipient|default:"-" }}</td>
+                    <td>{{ flow.get_return_reason_display|default:"-" }}</td>
+                    <td>{{ flow.remark|default:"-" }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-edit" onclick="openEditModal({{ flow.id }}, '{{ flow.part.name }}', '{{ flow.recipient|default:'' }}', '{{ flow.return_reason|default:'' }}', '{{ flow.remark|default:''|escapejs }}')">编辑</button>
+                        <button class="btn btn-sm btn-delete" onclick="confirmDelete({{ flow.id }})">删除</button>
+                        <button class="btn btn-sm btn-secondary" onclick="confirmCancel({{ flow.id }})">取消退库</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="9" class="text-center">暂无退库记录</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑退库记录 - <span id="edit_part_name"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="flow_id" id="edit_flow_id">
+                    <input type="hidden" name="action" value="edit">
+                    <div class="mb-3">
+                        <label class="form-label">退库人</label>
+                        <input type="text" name="return_person" id="edit_return_person" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">退库原因</label>
+                        <select name="return_reason" id="edit_return_reason" class="form-select" required>
+                            <option value="">请选择</option>
+                            <option value="damaged">损坏</option>
+                            <option value="replacement">更换</option>
+                            <option value="normal_return">正常归还</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea name="remark" id="edit_remark" class="form-control" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 筛选
+function applyFilters() {
+    var keyword = document.getElementById('keywordInput').value;
+    var url = '{% url "office_parts_return_management" %}?';
+    var params = [];
+    if (keyword) params.push('search=' + encodeURIComponent(keyword));
+    location.href = url + params.join('&');
+}
+
+// 重置
+function clearFilters() {
+    document.getElementById('keywordInput').value = '';
+    location.href = '{% url "office_parts_return_management" %}';
+}
+
+// 打开编辑弹窗
+function openEditModal(flowId, partName, returnPerson, returnReason, remark) {
+    document.getElementById('edit_flow_id').value = flowId;
+    document.getElementById('edit_part_name').textContent = partName;
+    document.getElementById('edit_return_person').value = returnPerson;
+    document.getElementById('edit_return_reason').value = returnReason;
+    document.getElementById('edit_remark').value = remark;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+// 提交编辑
+function submitEdit() {
+    $.post('', $('#editForm').serialize(), function(data) {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    });
+}
+
+// 确认删除
+function confirmDelete(flowId) {
+    if (confirm('确定要删除这条退库记录吗？')) {
+        $.post('', {
+            action: 'delete',
+            flow_id: flowId,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+}
+
+// 确认取消退库
+function confirmCancel(flowId) {
+    if (confirm('确定要取消这条退库记录吗？配件状态将恢复为"在用"')) {
+        $.post('', {
+            action: 'cancel',
+            flow_id: flowId,
+            csrfmiddlewaretoken: '{{ csrf_token }}'
+        }, function(data) {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

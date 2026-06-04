@@ -32,6 +32,31 @@
         .nav-item .arrow { margin-left: auto; font-size: 12px; opacity: 0.5; }
         
         /* 子菜单样式 */
+        .nav-item.has-submenu { position: relative; }
+        .nav-item.has-submenu .submenu-arrow { margin-left: auto; font-size: 10px; opacity: 0.6; transition: transform 0.3s; }
+        .nav-item.has-submenu.open .submenu-arrow { transform: rotate(180deg); }
+        .submenu {
+            margin-top: 4px;
+            margin-left: 20px;
+            border-left: 1px solid #e8e8e8;
+            padding-left: 8px;
+        }
+        .submenu a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            color: #8c8c8c;
+            text-decoration: none;
+            font-size: 13px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .submenu a:hover { background: #f5f5f5; color: #1890ff; }
+        .submenu a.active { background: #e6f7ff; color: #1890ff; font-weight: 500; }
+        .submenu a i { font-size: 14px; width: 16px; }
+        
+        /* 子菜单样式 */
         .nav-item-has-children { margin-bottom: 4px; }
         .nav-item-parent { position: relative; }
         .nav-arrow { margin-left: auto; transition: transform 0.3s; font-size: 12px; }
@@ -302,11 +327,26 @@
                             <span>服务器备件</span>
                         </a>
                     </div>
-                    <div class="nav-item">
-                        <a href="{% url 'office_parts_list' %}" {% if '/cmdb/office_parts' in request.path %}class="active"{% endif %}>
+                    <div class="nav-item has-submenu">
+                        <a href="#" onclick="toggleOfficePartsMenu(); return false;" {% if '/cmdb/office_parts' in request.path %}class="active"{% endif %}>
                             <i class="icon fas fa-laptop"></i>
                             <span>办公机配件</span>
+                            <i class="fas fa-chevron-down submenu-arrow"></i>
                         </a>
+                        <div class="submenu" style="{% if '/cmdb/office_parts' in request.path %}display: block;{% else %}display: none;{% endif %}">
+                            <a href="{% url 'office_parts_list' %}" {% if '/cmdb/office_parts/' in request.path and '/cmdb/office_parts/tracking' not in request.path and '/cmdb/office_parts/return' not in request.path %}class="active"{% endif %}>
+                                <i class="fas fa-list"></i>
+                                <span>配件列表</span>
+                            </a>
+                            <a href="{% url 'office_parts_tracking' %}" {% if '/cmdb/office_parts/tracking' in request.path %}class="active"{% endif %}>
+                                <i class="fas fa-search"></i>
+                                <span>配件去向追踪</span>
+                            </a>
+                            <a href="{% url 'office_parts_return_management' %}" {% if '/cmdb/office_parts/return' in request.path %}class="active"{% endif %}>
+                                <i class="fas fa-undo"></i>
+                                <span>配件退库管理</span>
+                            </a>
+                        </div>
                     </div>
                     <div class="nav-item">
                         <a href="{% url 'asset_relation_list' %}" {% if '/cmdb/asset_relations' in request.path %}{% if '/returned' in request.path %}{% else %}class="active"{% endif %}{% endif %}>
@@ -447,6 +487,18 @@
                 parent.classList.add('open');
             } else {
                 menu.style.display = 'none';
+                parent.classList.remove('open');
+            }
+        }
+
+        function toggleOfficePartsMenu() {
+            var submenu = document.querySelector('.nav-item.has-submenu .submenu');
+            var parent = document.querySelector('.nav-item.has-submenu');
+            if (submenu.style.display === 'none' || submenu.style.display === '') {
+                submenu.style.display = 'block';
+                parent.classList.add('open');
+            } else {
+                submenu.style.display = 'none';
                 parent.classList.remove('open');
             }
         }

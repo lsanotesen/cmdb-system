@@ -118,6 +118,14 @@ urlpatterns = [
     path('office_parts/<int:part_id>/delete/', views.office_part_delete, name='office_part_delete'),
     path('office_parts/batch_delete/', views.office_part_batch_delete, name='office_part_batch_delete'),
     path('office_parts/update_status/', views.office_part_update_status, name='office_part_update_status'),
+    # 办公机配件流转管理
+    path('office_parts/issue/', views.office_part_issue, name='office_part_issue'),
+    path('office_parts/return/apply/', views.office_part_return_apply, name='office_part_return_apply'),
+    path('office_parts/tracking/', views.office_parts_tracking, name='office_parts_tracking'),
+    path('office_parts/reissue/', views.office_part_reissue, name='office_part_reissue'),
+    path('office_parts/return/management/', views.office_parts_return_management, name='office_parts_return_management'),
+    path('office_parts/return/approve/', views.office_part_return_approve, name='office_part_return_approve'),
+    path('office_parts/get_last_recipient/', views.office_part_get_last_recipient, name='office_part_get_last_recipient'),
     
     # 备件管理
     path('spareparts/', views.spareparts_list, name='spareparts_list'),

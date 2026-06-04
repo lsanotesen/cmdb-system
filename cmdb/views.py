@@ -8,7 +8,7 @@ from django.db.models import Q, Case, When, Value, IntegerField
 from django.db.models.functions import Cast
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
-from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType, AssetRelation, InstallHistory, LifecycleEvent, OfficePart
+from .models import Host, Idc, Cabinet, HostGroup, IpSource, SSHConfig, BastionHost, CollectTask, CollectHistory, BatchCommand, BatchCommandHistory, StaticAsset, UserProfile, Module, Role, BackupRecord, OperationLog, SparePart, SparePartType, AssetRelation, InstallHistory, LifecycleEvent, OfficePart, OfficePartFlow, OfficePartReturnOrder
 from django.utils import timezone
 from .scheduler import update_scheduler_job
 import paramiko
@@ -4259,12 +4259,26 @@ def spareparts_list(request):
     """备件列表页面"""
     # 只显示未安装的备件（库存中、维修中、空状态等）
     spareparts = SparePart.objects.filter(status__in=['in_stock', 'maintenance', 'available', '']).order_by('-created_at')
+    
+    # 搜索和筛选
+    search_keyword = request.GET.get('keyword', '')
+    
+    if search_keyword:
+        spareparts = spareparts.filter(
+            Q(name__icontains=search_keyword) |
+            Q(brand__icontains=search_keyword) |
+            Q(model__icontains=search_keyword) |
+            Q(serial_number__icontains=search_keyword) |
+            Q(asset_code__icontains=search_keyword)
+        )
+    
     static_assets = StaticAsset.objects.all().order_by('asset_no')
     part_types = SparePartType.objects.filter(is_active=True).order_by('order')
     return render(request, 'cmdb/spareparts/list.html', {
         'spareparts': spareparts,
         'static_assets': static_assets,
-        'part_types': part_types
+        'part_types': part_types,
+        'search_keyword': search_keyword
     })
 
 
@@ -4272,6 +4286,19 @@ def spareparts_list(request):
 def server_spareparts_list(request):
     """服务器备件列表页面"""
     spareparts = SparePart.objects.filter(category='server', status__in=['in_stock', 'maintenance', 'available', '']).order_by('-created_at')
+    
+    # 搜索和筛选
+    search_keyword = request.GET.get('keyword', '')
+    
+    if search_keyword:
+        spareparts = spareparts.filter(
+            Q(name__icontains=search_keyword) |
+            Q(brand__icontains=search_keyword) |
+            Q(model__icontains=search_keyword) |
+            Q(serial_number__icontains=search_keyword) |
+            Q(asset_code__icontains=search_keyword)
+        )
+    
     static_assets = StaticAsset.objects.all().order_by('asset_no')
     part_types = SparePartType.objects.filter(is_active=True).order_by('order')
     return render(request, 'cmdb/spareparts/list.html', {
@@ -4279,7 +4306,8 @@ def server_spareparts_list(request):
         'static_assets': static_assets,
         'part_types': part_types,
         'category': 'server',
-        'category_name': '服务器备件'
+        'category_name': '服务器备件',
+        'search_keyword': search_keyword
     })
 
 
@@ -5626,7 +5654,7 @@ def api_batch_delete_lifecycle_events(request):
 @login_required
 def office_parts_list(request):
     """办公机配件列表页面"""
-    parts = OfficePart.objects.all().order_by('-created_at')
+    parts = OfficePart.objects.exclude(status='returned').order_by('-created_at')
     
     # 搜索和筛选
     search_keyword = request.GET.get('keyword', '')
@@ -5647,7 +5675,14 @@ def office_parts_list(request):
         parts = parts.filter(category=category_filter)
     
     if status_filter:
-        parts = parts.filter(status=status_filter)
+        # 如果筛选"在库"状态，同时包含 in_stock 和 used（拆机良品）
+        if status_filter == 'in_stock':
+            parts = parts.filter(status__in=['in_stock', 'used'])
+        else:
+            parts = parts.filter(status=status_filter)
+    
+    # 排除已退库和在用状态，这些状态通过操作产生
+    editable_statuses = [(v, l) for v, l in OfficePart.STATUS_CHOICES if v not in ['returned', 'issued']]
     
     context = {
         'parts': parts,
@@ -5655,7 +5690,8 @@ def office_parts_list(request):
         'category_filter': category_filter,
         'status_filter': status_filter,
         'categories': OfficePart.CATEGORY_CHOICES,
-        'statuses': OfficePart.STATUS_CHOICES,
+        'statuses': editable_statuses,
+        'today': timezone.now().strftime('%Y-%m-%d'),
     }
     return render(request, 'cmdb/office_parts/list.html', context)
 
@@ -5670,6 +5706,7 @@ def office_part_add(request):
             part.category = request.POST.get('category', 'other')
             part.brand = request.POST.get('brand', '')
             part.model = request.POST.get('model', '')
+            part.asset_number = request.POST.get('asset_number') or None
             part.serial_number = request.POST.get('serial_number') or None
             part.source_computer = request.POST.get('source_computer', '')
             part.status = request.POST.get('status', 'in_stock')
@@ -5719,6 +5756,7 @@ def office_part_edit(request, part_id):
                     'category': part.category,
                     'brand': part.brand,
                     'model': part.model,
+                    'asset_number': part.asset_number or '',
                     'serial_number': part.serial_number or '',
                     'source_computer': part.source_computer,
                     'status': part.status,
@@ -5738,6 +5776,7 @@ def office_part_edit(request, part_id):
             part.category = request.POST.get('category', 'other')
             part.brand = request.POST.get('brand', '')
             part.model = request.POST.get('model', '')
+            part.asset_number = request.POST.get('asset_number') or None
             part.serial_number = request.POST.get('serial_number') or None
             part.source_computer = request.POST.get('source_computer', '')
             part.status = request.POST.get('status', 'in_stock')
@@ -5829,6 +5868,375 @@ def office_part_batch_delete(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+# ==================== 办公机配件流转管理 ====================
+
+@login_required
+def office_part_issue(request):
+    """配件发放"""
+    if request.method == 'POST':
+        try:
+            part_id = request.POST.get('part_id')
+            recipient = request.POST.get('recipient')
+            department = request.POST.get('department')
+            issue_date = request.POST.get('issue_date')
+            remark = request.POST.get('remark', '')
+            
+            part = OfficePart.objects.get(id=part_id)
+            
+            # 检查状态是否允许发放
+            if part.status not in ['in_stock', 'new', 'returned']:
+                return JsonResponse({'success': False, 'error': '只有状态为"在库"、"全新"或"已退库"的配件才能发放'})
+            
+            # 更新配件状态
+            part.status = 'in_stock'
+            part.save()
+            
+            # 创建流转记录
+            OfficePartFlow.objects.create(
+                part=part,
+                flow_type='issue',
+                operator=request.user,
+                operator_name=request.user.username,
+                recipient=recipient,
+                department=department,
+                location=part.location,
+                remark=remark,
+            )
+            
+            return JsonResponse({'success': True, 'message': '发放成功'})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_part_return_apply(request):
+    """配件退库"""
+    if request.method == 'POST':
+        try:
+            part_id = request.POST.get('part_id')
+            return_person = request.POST.get('return_person')
+            return_date = request.POST.get('return_date')
+            return_reason = request.POST.get('return_reason')
+            remark = request.POST.get('remark', '')
+            
+            part = OfficePart.objects.get(id=part_id)
+            
+            # 待报废的配件可以直接退库
+            if part.status == 'retired':
+                # 更新配件状态为已退库
+                part.status = 'returned'
+                part.save()
+                
+                # 创建流转记录
+                OfficePartFlow.objects.create(
+                    part=part,
+                    flow_type='return',
+                    operator=request.user,
+                    operator_name=request.user.username,
+                    recipient=return_person,
+                    return_reason=return_reason,
+                    remark=remark,
+                )
+                
+                return JsonResponse({'success': True, 'message': '退库成功'})
+            
+            # 检查该配件是否有未退库的发放记录
+            latest_issue = OfficePartFlow.objects.filter(
+                part=part,
+                flow_type__in=['issue', 'reissue']
+            ).order_by('-created_at').first()
+            
+            latest_return = OfficePartFlow.objects.filter(
+                part=part,
+                flow_type='return'
+            ).order_by('-created_at').first()
+            
+            is_in_use = False
+            if latest_issue:
+                if latest_return:
+                    is_in_use = latest_issue.created_at > latest_return.created_at
+                else:
+                    is_in_use = True
+            
+            if not is_in_use:
+                return JsonResponse({'success': False, 'error': '该配件未被领用，无法退库'})
+            
+            # 更新配件状态为已退库
+            part.status = 'returned'
+            part.save()
+            
+            # 创建流转记录
+            OfficePartFlow.objects.create(
+                part=part,
+                flow_type='return',
+                operator=request.user,
+                operator_name=request.user.username,
+                recipient=return_person,
+                return_reason=return_reason,
+                remark=remark,
+            )
+            
+            return JsonResponse({'success': True, 'message': '退库成功'})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_parts_tracking(request):
+    """配件去向追踪页面 - 显示发放记录"""
+    search_query = request.GET.get('search', '')
+    status_filter = request.GET.get('status', '')
+    
+    # 查询发放记录（issue 和 reissue）
+    flow_records = OfficePartFlow.objects.filter(
+        flow_type__in=['issue', 'reissue']
+    ).select_related('part').order_by('-created_at')
+    
+    if search_query:
+        flow_records = flow_records.filter(
+            Q(part__serial_number__icontains=search_query) |
+            Q(part__name__icontains=search_query) |
+            Q(recipient__icontains=search_query) |
+            Q(department__icontains=search_query)
+        )
+    
+    # 计算每个配件是否有未退库的发放记录
+    for record in flow_records:
+        # 检查该配件是否有退库记录比最后一次发放更新
+        latest_issue = OfficePartFlow.objects.filter(
+            part=record.part,
+            flow_type__in=['issue', 'reissue']
+        ).order_by('-created_at').first()
+        
+        latest_return = OfficePartFlow.objects.filter(
+            part=record.part,
+            flow_type='return'
+        ).order_by('-created_at').first()
+        
+        if latest_issue and latest_return:
+            record.is_in_use = latest_issue.created_at > latest_return.created_at
+        elif latest_issue and not latest_return:
+            record.is_in_use = True
+        else:
+            record.is_in_use = False
+    
+    # 根据状态筛选
+    if status_filter:
+        if status_filter == 'issued':
+            flow_records = [r for r in flow_records if r.is_in_use]
+        elif status_filter == 'returned':
+            flow_records = [r for r in flow_records if not r.is_in_use]
+    
+    context = {
+        'flow_records': flow_records,
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'today': timezone.now().strftime('%Y-%m-%d'),
+    }
+    return render(request, 'cmdb/office_parts/tracking.html', context)
+
+
+@login_required
+def office_part_reissue(request):
+    """配件再次发放"""
+    if request.method == 'POST':
+        try:
+            part_id = request.POST.get('part_id')
+            recipient = request.POST.get('recipient')
+            department = request.POST.get('department')
+            remark = request.POST.get('remark', '')
+            
+            part = OfficePart.objects.get(id=part_id)
+            
+            # 检查状态是否允许发放
+            if part.status not in ['in_stock', 'new', 'returned']:
+                return JsonResponse({'success': False, 'error': '只有状态为"在库"、"全新"或"已退库"的配件才能发放'})
+            
+            # 更新配件状态
+            part.status = 'in_stock'
+            part.save()
+            
+            # 创建流转记录
+            OfficePartFlow.objects.create(
+                part=part,
+                flow_type='reissue',
+                operator=request.user,
+                operator_name=request.user.username,
+                recipient=recipient,
+                department=department,
+                location=part.location,
+                remark=remark,
+            )
+            
+            return JsonResponse({'success': True, 'message': '再次发放成功'})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_parts_return_management(request):
+    """配件退库管理页面"""
+    search_query = request.GET.get('search', '')
+    
+    # 编辑退库记录
+    if request.method == 'POST' and request.POST.get('action') == 'edit':
+        try:
+            flow_id = request.POST.get('flow_id')
+            return_person = request.POST.get('return_person')
+            return_reason = request.POST.get('return_reason')
+            remark = request.POST.get('remark', '')
+            
+            flow = OfficePartFlow.objects.get(id=flow_id)
+            flow.recipient = return_person
+            flow.return_reason = return_reason
+            flow.remark = remark
+            flow.save()
+            
+            return JsonResponse({'success': True, 'message': '编辑成功'})
+        except OfficePartFlow.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '记录不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # 删除退库记录
+    if request.method == 'POST' and request.POST.get('action') == 'delete':
+        try:
+            flow_id = request.POST.get('flow_id')
+            flow = OfficePartFlow.objects.get(id=flow_id)
+            flow.delete()
+            return JsonResponse({'success': True, 'message': '删除成功'})
+        except OfficePartFlow.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '记录不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # 取消退库
+    if request.method == 'POST' and request.POST.get('action') == 'cancel':
+        try:
+            flow_id = request.POST.get('flow_id')
+            flow = OfficePartFlow.objects.get(id=flow_id)
+            
+            # 恢复配件状态为在用
+            flow.part.status = 'issued'
+            flow.part.save()
+            
+            # 删除退库记录
+            flow.delete()
+            
+            return JsonResponse({'success': True, 'message': '取消退库成功'})
+        except OfficePartFlow.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '记录不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    # 查询退库记录
+    flow_records = OfficePartFlow.objects.filter(
+        flow_type='return'
+    ).select_related('part').order_by('-created_at')
+    
+    if search_query:
+        flow_records = flow_records.filter(
+            Q(part__serial_number__icontains=search_query) |
+            Q(part__name__icontains=search_query) |
+            Q(recipient__icontains=search_query)
+        )
+    
+    context = {
+        'flow_records': flow_records,
+        'search_query': search_query,
+    }
+    return render(request, 'cmdb/office_parts/return_management.html', context)
+
+
+@login_required
+def office_part_return_approve(request):
+    """审核退库单"""
+    if request.method == 'POST':
+        try:
+            order_id = request.POST.get('order_id')
+            action = request.POST.get('action')  # 'approve' or 'reject'
+            reject_reason = request.POST.get('reject_reason', '')
+            
+            order = OfficePartReturnOrder.objects.get(id=order_id)
+            
+            if action == 'approve':
+                # 审核通过
+                order.status = 'approved'
+                order.approver = request.user
+                order.approved_at = timezone.now()
+                
+                # 更新配件状态为在库
+                order.part.status = 'in_stock'
+                order.part.save()
+                
+                # 创建入库流转记录
+                OfficePartFlow.objects.create(
+                    part=order.part,
+                    flow_type='in',
+                    operator=request.user,
+                    operator_name=request.user.username,
+                    location=order.part.location,
+                    remark=f'退库审核通过，重新入库',
+                )
+                
+                message = '审核通过，配件已重新入库'
+            elif action == 'reject':
+                # 驳回
+                order.status = 'rejected'
+                order.approver = request.user
+                order.approved_at = timezone.now()
+                order.reject_reason = reject_reason
+                
+                # 恢复配件状态为在用
+                order.part.status = 'issued'
+                order.part.save()
+                
+                message = '已驳回退库申请'
+            else:
+                return JsonResponse({'success': False, 'error': '无效的操作类型'})
+            
+            order.save()
+            return JsonResponse({'success': True, 'message': message})
+        except OfficePartReturnOrder.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '退库单不存在'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': '只支持POST请求'})
+
+
+@login_required
+def office_part_get_last_recipient(request):
+    """获取配件上次发放的领用人信息"""
+    if request.method == 'GET':
+        try:
+            part_id = request.GET.get('part_id')
+            part = OfficePart.objects.get(id=part_id)
+            
+            # 获取上次发放记录
+            last_issue_flow = part.flows.filter(flow_type__in=['issue', 'reissue']).last()
+            
+            if last_issue_flow:
+                return JsonResponse({
+                    'success': True,
+                    'recipient': last_issue_flow.recipient,
+                    'department': last_issue_flow.department,
+                })
+            else:
+                return JsonResponse({'success': True, 'recipient': '', 'department': ''})
+        except OfficePart.DoesNotExist:
+            return JsonResponse({'success': False, 'error': '配件不存在'})
+    return JsonResponse({'success': False, 'error': '只支持GET请求'})
 
 
 # ==================== 组件历史查询 ====================

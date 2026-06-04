@@ -48,6 +48,12 @@
             </div>
         </div>
 
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px;">
+            <div style="font-size: 14px; color: #666;">
+                共 <span style="font-weight: 600; color: #1a1a1a;">{{ parts|length }}</span> 条办公机配件
+            </div>
+        </div>
+
         <div class="table-container">
         <table class="data-table">
             <thead>
@@ -55,6 +61,8 @@
                 <th style="width: 40px;">
                     <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                 </th>
+                <th style="width: 60px;">序号</th>
+                <th>资产编号</th>
                 <th>名称</th>
                 <th>分类</th>
                 <th>品牌</th>
@@ -72,6 +80,8 @@
                 {% for part in parts %}
                 <tr>
                     <td><input type="checkbox" class="part-checkbox" value="{{ part.id }}"></td>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ part.asset_number|default:"-" }}</td>
                     <td>{{ part.name }}</td>
                     <td>
                         {% if part.category == 'cpu' %}<span class="badge bg-primary">CPU</span>{% endif %}
@@ -97,12 +107,13 @@
                     <td>{{ part.dismantle_date|date:"Y-m-d"|default:"-" }}</td>
                     <td>
                         {% if part.status == 'new' %}<span class="badge bg-success">全新</span>{% endif %}
-                        {% if part.status == 'used' %}<span class="badge bg-info">拆机良品</span>{% endif %}
-                        {% if part.status == 'in_stock' %}<span class="badge bg-secondary">闲置库存</span>{% endif %}
+                        {% if part.status == 'used' or part.status == 'in_stock' %}<span class="badge bg-secondary">在库</span>{% endif %}
                         {% if part.status == 'installed' %}<span class="badge bg-success">使用中</span>{% endif %}
                         {% if part.status == 'pending' %}<span class="badge bg-warning">待检测</span>{% endif %}
+                        {% if part.status == 'returned' %}<span class="badge bg-secondary">已退库</span>{% endif %}
                         {% if part.status == 'faulty' %}<span class="badge bg-danger">故障</span>{% endif %}
                         {% if part.status == 'retired' %}<span class="badge bg-secondary">待报废</span>{% endif %}
+                        {% if part.status not in 'new,used,in_stock,installed,pending,returned,faulty,retired' %}<span class="badge bg-default">{{ part.status }}</span>{% endif %}
                     </td>
                     <td>{{ part.updated_at|date:"Y-m-d H:i" }}</td>
                     <td>
@@ -115,6 +126,12 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if part.status == 'in_stock' or part.status == 'new' or part.status == 'used' %}
+                        <button class="btn btn-sm btn-primary" onclick="openIssueModal({{ part.id }}, '{{ part.name|escapejs }}')">发放</button>
+                        {% endif %}
+                        {% if part.status == 'retired' or part.status == 'faulty' %}
+                        <button class="btn btn-sm btn-warning" onclick="openReturnModal({{ part.id }}, '{{ part.name|escapejs }}')">退库</button>
+                        {% endif %}
                         <button class="btn btn-sm btn-edit" onclick="openEditModal({{ part.id }})">编辑</button>
                         <button class="btn btn-sm btn-delete" onclick="deletePart({{ part.id }})">删除</button>
                     </td>
@@ -167,9 +184,15 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label>资产编号</label>
+                            <input type="text" name="asset_number" class="form-control">
+                        </div>
+                        <div class="form-group">
                             <label>SN</label>
                             <input type="text" name="serial_number" class="form-control">
                         </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>来源办公电脑</label>
                             <input type="text" name="source_computer" class="form-control" placeholder="如: PC-2024-001">
@@ -218,6 +241,89 @@
     </div>
 </div>
 
+<!-- 发放弹窗 -->
+<div class="modal fade" id="issueModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">配件发放</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>配件：<strong id="issue_part_name"></strong></p>
+                <form id="issueForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="part_id" id="issue_part_id">
+                    <div class="mb-3">
+                        <label class="form-label">领用人 *</label>
+                        <input type="text" name="recipient" class="form-control" required placeholder="请输入领用人姓名">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">所属部门</label>
+                        <input type="text" name="department" class="form-control" placeholder="请输入部门名称">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">领用日期 *</label>
+                        <input type="date" name="issue_date" class="form-control" value="{{ today }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea name="remark" class="form-control" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitIssue()">确认发放</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 退库弹窗 -->
+<div class="modal fade" id="returnModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">配件退库</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>配件：<strong id="return_part_name"></strong></p>
+                <form id="returnForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="part_id" id="return_part_id">
+                    <div class="mb-3">
+                        <label class="form-label">退库人 *</label>
+                        <input type="text" name="return_person" class="form-control" required placeholder="请输入退库人姓名">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">退库日期 *</label>
+                        <input type="date" name="return_date" class="form-control" value="{{ today }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">退库原因 *</label>
+                        <select name="return_reason" class="form-select" required>
+                            <option value="">请选择</option>
+                            <option value="damaged">损坏</option>
+                            <option value="replacement">更换</option>
+                            <option value="normal_return">正常归还</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea name="remark" class="form-control" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitReturn()">提交退库</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 编辑配件弹窗 -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -256,9 +362,15 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label>资产编号</label>
+                            <input type="text" name="asset_number" id="edit_asset_number" class="form-control">
+                        </div>
+                        <div class="form-group">
                             <label>SN</label>
                             <input type="text" name="serial_number" id="edit_serial_number" class="form-control">
                         </div>
+                    </div>
+                    <div class="form-row">
                         <div class="form-group">
                             <label>来源办公电脑</label>
                             <input type="text" name="source_computer" id="edit_source_computer" class="form-control">
@@ -312,6 +424,60 @@
 </div>
 
 <script>
+// 发放
+function openIssueModal(partId, partName) {
+    document.getElementById('issue_part_id').value = partId;
+    document.getElementById('issue_part_name').textContent = partName;
+    document.getElementById('issueForm').reset();
+    document.getElementById('issue_part_id').value = partId;
+    new bootstrap.Modal(document.getElementById('issueModal')).show();
+}
+
+function submitIssue() {
+    $.post('{% url "office_part_issue" %}', {
+        part_id: $('#issue_part_id').val(),
+        recipient: $('#issueForm input[name="recipient"]').val(),
+        department: $('#issueForm input[name="department"]').val(),
+        issue_date: $('#issueForm input[name="issue_date"]').val(),
+        remark: $('#issueForm textarea[name="remark"]').val(),
+        csrfmiddlewaretoken: '{{ csrf_token }}'
+    }, function(data) {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('发放失败: ' + data.error);
+        }
+    });
+}
+
+// 退库
+function openReturnModal(partId, partName) {
+    document.getElementById('return_part_id').value = partId;
+    document.getElementById('return_part_name').textContent = partName;
+    document.getElementById('returnForm').reset();
+    document.getElementById('return_part_id').value = partId;
+    new bootstrap.Modal(document.getElementById('returnModal')).show();
+}
+
+function submitReturn() {
+    $.post('{% url "office_part_return_apply" %}', {
+        part_id: $('#return_part_id').val(),
+        return_person: $('#returnForm input[name="return_person"]').val(),
+        return_date: $('#returnForm input[name="return_date"]').val(),
+        return_reason: $('#returnForm select[name="return_reason"]').val(),
+        remark: $('#returnForm textarea[name="remark"]').val(),
+        csrfmiddlewaretoken: '{{ csrf_token }}'
+    }, function(data) {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('退库失败: ' + data.error);
+        }
+    });
+}
+
 // 图片预览函数
 function openImagePreview(src) {
     var modal = document.createElement('div');
@@ -373,6 +539,7 @@ function openEditModal(partId) {
             document.getElementById('edit_category').value = part.category;
             document.getElementById('edit_brand').value = part.brand;
             document.getElementById('edit_model').value = part.model;
+            document.getElementById('edit_asset_number').value = part.asset_number;
             document.getElementById('edit_serial_number').value = part.serial_number;
             document.getElementById('edit_source_computer').value = part.source_computer;
             document.getElementById('edit_status').value = part.status;
