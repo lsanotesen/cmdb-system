@@ -5494,6 +5494,17 @@ def api_add_to_spareparts(request):
                 # 标记为已退库（添加到备件库）
                 relation.is_returned = True
                 relation.returned_at = timezone.now()
+                
+                # 填充冗余字段，保存资产信息
+                if relation.parent_asset:
+                    relation.parent_asset_no = relation.parent_asset.asset_no or ''
+                    relation.parent_asset_name = relation.parent_asset.hostname or relation.parent_asset.memo or ''
+                if relation.child_asset:
+                    relation.child_asset_no = relation.child_asset.asset_no or ''
+                    relation.child_asset_name = relation.child_asset.memo or relation.child_asset.hostname or ''
+                    relation.child_asset_model = relation.child_asset.device_model or ''
+                    relation.child_asset_sn = relation.child_asset.sn or ''
+                
                 relation.save()
                 
                 # 如果父资产和子资产不同（备件退库时创建的独立父资产），删除父资产记录
@@ -5570,6 +5581,17 @@ def api_batch_return_to_warehouse(request):
                     # 标记为已退库
                     relation.is_returned = True
                     relation.returned_at = timezone.now()
+                    
+                    # 填充冗余字段，保存资产信息
+                    if relation.parent_asset:
+                        relation.parent_asset_no = relation.parent_asset.asset_no or ''
+                        relation.parent_asset_name = relation.parent_asset.hostname or relation.parent_asset.memo or ''
+                    if relation.child_asset:
+                        relation.child_asset_no = relation.child_asset.asset_no or ''
+                        relation.child_asset_name = relation.child_asset.memo or relation.child_asset.hostname or ''
+                        relation.child_asset_model = relation.child_asset.device_model or ''
+                        relation.child_asset_sn = relation.child_asset.sn or ''
+                    
                     relation.save()
                     
                     # 添加生命周期事件

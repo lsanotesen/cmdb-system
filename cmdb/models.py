@@ -562,6 +562,15 @@ class AssetRelation(models.Model):
     """资产关系模型 - 主资产与子资产的关系"""
     parent_asset = models.ForeignKey('Host', verbose_name='主资产（服务器）', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_relations')
     child_asset = models.ForeignKey('Host', verbose_name='子资产（组件）', on_delete=models.SET_NULL, null=True, blank=True, related_name='parent_relations')
+    
+    # 冗余字段 - 用于保存资产信息，即使关联的Host被删除也能显示
+    parent_asset_no = models.CharField('主资产编号', max_length=100, blank=True)
+    parent_asset_name = models.CharField('主资产名称', max_length=200, blank=True)
+    child_asset_no = models.CharField('子资产编号', max_length=100, blank=True)
+    child_asset_name = models.CharField('子资产名称', max_length=200, blank=True)
+    child_asset_model = models.CharField('子资产型号', max_length=100, blank=True)
+    child_asset_sn = models.CharField('子资产序列号', max_length=100, blank=True)
+    
     slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
     is_removable = models.BooleanField('是否可拆卸', default=True)
     is_active = models.BooleanField('是否有效', default=True)

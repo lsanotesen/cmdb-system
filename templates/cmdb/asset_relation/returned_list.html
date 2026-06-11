@@ -42,11 +42,11 @@
             <tbody>
                 {% for relation in relations %}
                 <tr>
-                    <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
-                    <td>{% if relation.child_asset %}{{ relation.child_asset.asset_no|default:"-" }}{% else %}-{% endif %}</td>
-                    <td>{% if relation.child_asset %}{{ relation.child_asset.memo|default:relation.child_asset.hostname|default:"-" }}{% else %}-{% endif %}</td>
-                    <td>{% if relation.child_asset %}{{ relation.child_asset.device_model|default:"-" }}{% else %}-{% endif %}</td>
-                    <td>{% if relation.child_asset %}{{ relation.child_asset.sn|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.parent_asset_no %}{{ relation.parent_asset_no }}{% elif relation.parent_asset %}{{ relation.parent_asset.asset_no|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset_no %}{{ relation.child_asset_no }}{% elif relation.child_asset %}{{ relation.child_asset.asset_no|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset_name %}{{ relation.child_asset_name }}{% elif relation.child_asset %}{{ relation.child_asset.memo|default:relation.child_asset.hostname|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset_model %}{{ relation.child_asset_model }}{% elif relation.child_asset %}{{ relation.child_asset.device_model|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset_sn %}{{ relation.child_asset_sn }}{% elif relation.child_asset %}{{ relation.child_asset.sn|default:"-" }}{% else %}-{% endif %}</td>
                     <td>{{ relation.slot|default:"-" }}</td>
                     <td>{{ relation.returned_at|date:"Y-m-d H:i:s" }}</td>
                     <td>
