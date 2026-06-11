@@ -5036,7 +5036,8 @@ def api_install_sparepart(request):
                         'asset_no': sparepart.asset_code,  # 备件资产编号
                         'images': sparepart.images,  # 备件图片
                         'brand': sparepart.brand,  # 备件品牌
-                        'disk': sparepart.size  # 备件大小（存储到disk字段）
+                        'disk': sparepart.size,  # 备件大小（存储到disk字段）
+                        'asset_type': sparepart.type.name if sparepart.type else ''  # 备件类型
                     }
                 )
 
@@ -5486,6 +5487,7 @@ def api_add_to_spareparts(request):
                 serial_number = relation.child_asset_sn or (child_asset.sn if child_asset else '')
                 images = relation.child_asset_images or (child_asset.images if child_asset else '')
                 brand_info = child_asset.brand if child_asset else ''
+                asset_type_info = relation.child_asset_type or (child_asset.asset_type if child_asset else '')
                 
                 # 如果没有任何资产信息，报错
                 if not asset_no and not asset_name:
@@ -5501,12 +5503,12 @@ def api_add_to_spareparts(request):
                     if match:
                         size_info = f"{match.group(1)}{match.group(2)}"
                 
-                # 尝试恢复备件类型
+                # 尝试恢复备件类型（优先使用冗余字段）
                 sparepart_type = None
-                if child_asset and child_asset.asset_type:
+                if asset_type_info:
                     # 尝试查找现有的备件类型（使用first处理可能存在多个同名类型的情况）
                     from cmdb.models import SparePartType
-                    sparepart_type = SparePartType.objects.filter(name=child_asset.asset_type).first()
+                    sparepart_type = SparePartType.objects.filter(name=asset_type_info).first()
                 
                 sparepart = SparePart.objects.create(
                     asset_code=asset_no,
@@ -5539,6 +5541,7 @@ def api_add_to_spareparts(request):
                     relation.child_asset_model = relation.child_asset.device_model or ''
                     relation.child_asset_sn = relation.child_asset.sn or ''
                     relation.child_asset_images = relation.child_asset.images or ''
+                    relation.child_asset_type = relation.child_asset.asset_type or ''
                 
                 relation.save()
                 
@@ -5632,6 +5635,7 @@ def api_batch_return_to_warehouse(request):
                         relation.child_asset_model = relation.child_asset.device_model or ''
                         relation.child_asset_sn = relation.child_asset.sn or ''
                         relation.child_asset_images = relation.child_asset.images or ''
+                        relation.child_asset_type = relation.child_asset.asset_type or ''
                     
                     relation.save()
                     

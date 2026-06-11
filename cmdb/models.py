@@ -571,6 +571,7 @@ class AssetRelation(models.Model):
     child_asset_model = models.CharField('子资产型号', max_length=100, blank=True)
     child_asset_sn = models.CharField('子资产序列号', max_length=100, blank=True)
     child_asset_images = models.TextField('子资产图片（JSON格式）', blank=True)
+    child_asset_type = models.CharField('子资产类型', max_length=100, blank=True)
     
     slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
     is_removable = models.BooleanField('是否可拆卸', default=True)
