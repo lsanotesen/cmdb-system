@@ -751,7 +751,7 @@ function previewImages(input, previewId) {
 }
 
 // 记录最后点击的复选框索引
-var lastCheckedIndex = -1;
+var lastCheckedCheckbox = null;
 
 // 全选/取消全选
 function toggleSelectAll() {
@@ -762,6 +762,8 @@ function toggleSelectAll() {
         checkbox.checked = selectAll.checked;
     });
     
+    // 重置最后点击记录
+    lastCheckedCheckbox = null;
     updateBatchDeleteButton();
 }
 
@@ -779,23 +781,33 @@ function updateBatchDeleteButton() {
 
 // 处理复选框点击（支持 Shift 多选）
 function handleCheckboxClick(event) {
+    var target = event.target;
+    
+    // 如果点击的不是复选框本身，找到复选框元素
+    if (target.tagName !== 'INPUT' || target.type !== 'checkbox') {
+        target = target.closest('input[type="checkbox"]');
+        if (!target) return;
+    }
+    
     var checkboxes = Array.from(document.querySelectorAll('.part-checkbox'));
-    var currentIndex = checkboxes.indexOf(event.target);
+    var currentIndex = checkboxes.indexOf(target);
     
     // 如果按住 Shift 键且之前有选中过
-    if (event.shiftKey && lastCheckedIndex !== -1 && lastCheckedIndex !== currentIndex) {
+    if (event.shiftKey && lastCheckedCheckbox !== null && lastCheckedCheckbox !== target) {
+        var lastIndex = checkboxes.indexOf(lastCheckedCheckbox);
+        
         // 确定选择范围
-        var start = Math.min(lastCheckedIndex, currentIndex);
-        var end = Math.max(lastCheckedIndex, currentIndex);
+        var start = Math.min(lastIndex, currentIndex);
+        var end = Math.max(lastIndex, currentIndex);
         
         // 选中范围内的所有复选框
         for (var i = start; i <= end; i++) {
-            checkboxes[i].checked = event.target.checked;
+            checkboxes[i].checked = target.checked;
         }
     }
     
-    // 更新最后点击的索引
-    lastCheckedIndex = currentIndex;
+    // 更新最后点击的复选框
+    lastCheckedCheckbox = target;
     
     updateBatchDeleteButton();
 }
@@ -804,7 +816,8 @@ function handleCheckboxClick(event) {
 document.addEventListener('DOMContentLoaded', function() {
     var checkboxes = document.querySelectorAll('.part-checkbox');
     checkboxes.forEach(function(checkbox) {
-        checkbox.addEventListener('click', handleCheckboxClick);
+        checkbox.addEventListener('mousedown', handleCheckboxClick);
+        checkbox.addEventListener('keydown', handleCheckboxClick);
     });
 });
 
