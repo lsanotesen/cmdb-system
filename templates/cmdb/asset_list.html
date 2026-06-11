@@ -210,18 +210,18 @@ function selectAll() {
 
 // 处理复选框点击（支持 Shift 多选）
 function handleHostCheckboxClick(event) {
-    const target = event.target;
+    // 使用closest找到复选框（处理点击复选框标签的情况）
+    const checkbox = event.target.closest('input[type="checkbox"].host-checkbox');
     
-    // 确保目标是复选框
-    if (target.tagName !== 'INPUT' || target.type !== 'checkbox') {
+    if (!checkbox) {
         return;
     }
     
     const checkboxes = Array.from(document.querySelectorAll('.host-checkbox'));
-    const currentIndex = checkboxes.indexOf(target);
+    const currentIndex = checkboxes.indexOf(checkbox);
     
     // 如果按住 Shift 键且之前有选中过
-    if (event.shiftKey && lastCheckedHostCheckbox !== null && lastCheckedHostCheckbox !== target) {
+    if (event.shiftKey && lastCheckedHostCheckbox !== null && lastCheckedHostCheckbox !== checkbox) {
         const lastIndex = checkboxes.indexOf(lastCheckedHostCheckbox);
         
         // 确定选择范围
@@ -230,12 +230,12 @@ function handleHostCheckboxClick(event) {
         
         // 选中范围内的所有复选框
         for (let i = start; i <= end; i++) {
-            checkboxes[i].checked = target.checked;
+            checkboxes[i].checked = checkbox.checked;
         }
     }
     
     // 更新最后点击的复选框
-    lastCheckedHostCheckbox = target;
+    lastCheckedHostCheckbox = checkbox;
 }
 
 // 批量删除
@@ -276,13 +276,14 @@ function batchDelete() {
     });
 }
 
-// 页面加载完成后绑定事件
+// 页面加载完成后绑定事件（使用事件委托）
 document.addEventListener('DOMContentLoaded', function() {
-    const checkboxes = document.querySelectorAll('.host-checkbox');
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('mousedown', handleHostCheckboxClick);
-        checkbox.addEventListener('keydown', handleHostCheckboxClick);
-    });
+    // 使用事件委托，监听表格容器上的点击事件
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        tableContainer.addEventListener('click', handleHostCheckboxClick);
+        tableContainer.addEventListener('mousedown', handleHostCheckboxClick);
+    }
 });
 </script>
 {% endblock %}
