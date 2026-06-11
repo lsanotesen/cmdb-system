@@ -5083,7 +5083,7 @@ def api_install_sparepart(request):
 
 @login_required
 def api_return_sparepart(request):
-    """将备件退库到已退库设备列表"""
+    """将备件退库（不创建动态资产）"""
     if request.method == 'POST':
         try:
             data = request.POST
@@ -5093,53 +5093,10 @@ def api_return_sparepart(request):
             with transaction.atomic():
                 sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
                 
-                # 创建子资产Host记录（存储备件信息）
-                child_hostname = f"returned-sparepart-{sparepart.id}-{int(timezone.now().timestamp())}"
-                # 保存备件类型名称（用于后续恢复）
-                sparepart_type_name = sparepart.type.name if sparepart.type else ''
-                child_host = Host.objects.create(
-                    hostname=child_hostname,
-                    device_model=sparepart.model,
-                    sn=sparepart.serial_number,
-                    ip='0.0.0.0',
-                    memo=sparepart.name,
-                    asset_no=sparepart.asset_code,
-                    images=sparepart.images,
-                    brand=sparepart.brand,
-                    disk=sparepart.size,
-                    asset_type=sparepart_type_name
-                )
-
-                # 创建父资产Host记录（用于显示原主资产编号，为空表示无主资产）
-                parent_hostname = f"parent-{child_hostname}"
-                parent_host = Host.objects.create(
-                    hostname=parent_hostname,
-                    device_model='',
-                    sn='',
-                    ip='0.0.0.0',
-                    memo='备件退库（无主资产）',
-                    asset_no='',  # 原主资产编号为空
-                    images='',
-                    brand='',
-                    disk='',
-                    asset_type=''
-                )
-
-                # 创建资产关系，标记为已退库
-                relation = AssetRelation.objects.create(
-                    parent_asset=parent_host,
-                    child_asset=child_host,
-                    slot=sparepart.location,
-                    is_removable=True,
-                    is_active=False,
-                    is_returned=True,
-                    returned_at=timezone.now()
-                )
-
                 # 记录操作日志
                 log_operation(request.user, 'update', f'备件退库: {sparepart.name}', '备件退库操作', request.META.get('REMOTE_ADDR'))
 
-                # 删除备件记录
+                # 删除备件记录（备件退库后直接删除，不创建动态资产）
                 sparepart.delete()
 
                 return JsonResponse({'success': True, 'message': '备件退库成功'})
@@ -5152,104 +5109,23 @@ def api_return_sparepart(request):
 
 @login_required
 def api_direct_install_component(request):
-    """直接安装新组件（未经过备件库）"""
+    """直接安装新组件（未经过备件库）- 已禁用自动创建动态资产"""
     if request.method == 'POST':
         try:
             data = request.POST
-            static_asset_id = data.get('parent_host_id')  # 现在是StaticAsset的ID
+            static_asset_id = data.get('parent_host_id')
             component_name = data.get('component_name')
-            component_asset_no = data.get('component_asset_no', '')  # 新增字段
-            component_model = data.get('component_model', '')
-            component_sn = data.get('component_sn', '')
             slot = data.get('slot', '')
-            is_removable = data.get('is_removable', 'true').lower() == 'true'
-            purchase_order_no = data.get('purchase_order_no', '')
-            install_time_str = data.get('install_time', '')
             remark = data.get('remark', '')
 
-            with transaction.atomic():
-                # 获取静态资产信息
-                static_asset = StaticAsset.objects.select_for_update().get(id=static_asset_id)
-                
-                # 根据静态资产找到或创建对应的Host记录
-                parent_host, created = Host.objects.get_or_create(
-                    asset_no=static_asset.asset_no,
-                    defaults={
-                        'hostname': static_asset.asset_no or f"host-{static_asset.id}",
-                        'ip': static_asset.ip or '0.0.0.0',
-                        'device_model': static_asset.device_model,
-                        'status': static_asset.status
-                    }
-                )
+            # 获取静态资产信息
+            static_asset = StaticAsset.objects.get(id=static_asset_id)
+            
+            # 记录操作日志
+            log_operation(request.user, 'update', f'组件安装记录: {component_name} 到 {static_asset.asset_no}', '组件安装操作', request.META.get('REMOTE_ADDR'))
 
-                slot_occupied = AssetRelation.objects.select_for_update()\
-                    .filter(parent_asset_id=parent_host.id, slot=slot, is_active=True).exists()
-                if slot_occupied:
-                    return JsonResponse({'success': False, 'error': f'槽位 {slot} 已被占用'})
-
-                # 获取用户输入的显示名称（可以重复）
-                component_display_name = data.get('component_display_name', '').strip()
-                
-                # 自动生成唯一的hostname
-                host_identifier = static_asset.asset_no or static_asset.ip or str(static_asset.id)
-                hostname = f"direct-{host_identifier}-{component_name.replace(' ', '-').lower()}-{int(timezone.now().timestamp())}"
-                
-                child_host = Host.objects.create(
-                    hostname=hostname,
-                    memo=component_display_name or component_name,  # 使用memo字段存储显示名称
-                    asset_no=component_asset_no,  # 使用资产编号
-                    device_model=component_model,
-                    sn=component_sn,
-                    ip='0.0.0.0'
-                )
-
-                relation = AssetRelation.objects.create(
-                    parent_asset=parent_host,
-                    child_asset=child_host,
-                    slot=slot,
-                    is_removable=is_removable,
-                    is_active=True
-                )
-
-                install_time = timezone.now()
-                if install_time_str:
-                    try:
-                        from datetime import datetime
-                        install_time = datetime.strptime(install_time_str, '%Y-%m-%dT%H:%M')
-                        from django.utils.timezone import make_aware
-                        install_time = make_aware(install_time)
-                    except:
-                        pass
-
-                InstallHistory.objects.create(
-                    asset_relation=relation,
-                    parent_asset=parent_host,
-                    child_asset=child_host,
-                    install_time=install_time,
-                    operator=request.user,
-                    operation_type='direct_install',
-                    source_type='direct_purchase',
-                    purchase_order_no=purchase_order_no or None,
-                    remark=remark or f'直接采购安装'
-                )
-
-                LifecycleEvent.objects.create(
-                    asset=child_host,
-                    event_type='purchase',
-                    event_time=install_time,
-                    operator=request.user,
-                    remark=f'直接采购安装到 {parent_host.hostname} 的 {slot} 槽位'
-                )
-
-                LifecycleEvent.objects.create(
-                    asset=child_host,
-                    event_type='deploy',
-                    event_time=timezone.now(),
-                    operator=request.user,
-                    remark=f'安装到主机 {parent_host.hostname} 的 {slot} 槽位'
-                )
-
-            return JsonResponse({'success': True, 'relation_id': relation.id})
+            # 不创建动态资产，只返回成功消息
+            return JsonResponse({'success': True, 'message': f'组件 {component_name} 安装记录已保存，动态资产仅从采集任务同步'})
         except StaticAsset.DoesNotExist:
             return JsonResponse({'success': False, 'error': '静态资产不存在'})
         except Exception as e:

@@ -155,12 +155,8 @@
                         </td>
                         <td>
                             <button class="btn btn-sm btn-detail" data-url="{% url 'asset_detail' host.id %}" onclick="location.href=this.dataset.url">详情</button>
-                            {% if user|has_permission:'asset_edit' %}
                             <button class="btn btn-sm btn-edit" data-url="{% url 'asset_edit' host.id %}" onclick="location.href=this.dataset.url">编辑</button>
-                            {% endif %}
-                            {% if user|has_permission:'asset_delete' %}
                             <button class="btn btn-sm btn-delete" data-url="{% url 'asset_delete' host.id %}" data-name="{{ host.hostname|escapejs }}" onclick="confirmDelete(this.dataset.url, this.dataset.name)">删除</button>
-                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
