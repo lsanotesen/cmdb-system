@@ -24,7 +24,7 @@
         <div class="container-fluid">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">{{ relation.parent_asset.name }} -> {{ relation.child_asset.name }}</h3>
+                    <h3 class="card-title">{{ relation.parent_asset.name }} -> {% if relation.child_asset %}{{ relation.child_asset.name }}{% else %}-{% endif %}</h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -35,7 +35,7 @@
                             </div>
                             <div class="detail-item">
                                 <label>子资产</label>
-                                <span>{{ relation.child_asset.name }}</span>
+                                <span>{% if relation.child_asset %}{{ relation.child_asset.name }}{% else %}-{% endif %}</span>
                             </div>
                             <div class="detail-item">
                                 <label>槽位</label>
@@ -57,11 +57,11 @@
                             </div>
                             <div class="detail-item">
                                 <label>子资产型号</label>
-                                <span>{{ relation.child_asset.model|default:"-" }}</span>
+                                <span>{% if relation.child_asset %}{{ relation.child_asset.model|default:"-" }}{% else %}-{% endif %}</span>
                             </div>
                             <div class="detail-item">
                                 <label>子资产序列号</label>
-                                <span>{{ relation.child_asset.serial_number|default:"-" }}</span>
+                                <span>{% if relation.child_asset %}{{ relation.child_asset.serial_number|default:"-" }}{% else %}-{% endif %}</span>
                             </div>
                             <div class="detail-item">
                                 <label>创建时间</label>
