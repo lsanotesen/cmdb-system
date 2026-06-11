@@ -560,7 +560,7 @@ class OfficePartReturnOrder(models.Model):
 
 class AssetRelation(models.Model):
     """资产关系模型 - 主资产与子资产的关系"""
-    parent_asset = models.ForeignKey('Host', verbose_name='主资产（服务器）', on_delete=models.CASCADE, related_name='child_relations')
+    parent_asset = models.ForeignKey('Host', verbose_name='主资产（服务器）', on_delete=models.SET_NULL, null=True, blank=True, related_name='child_relations')
     child_asset = models.ForeignKey('Host', verbose_name='子资产（组件）', on_delete=models.SET_NULL, null=True, blank=True, related_name='parent_relations')
     slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
     is_removable = models.BooleanField('是否可拆卸', default=True)
