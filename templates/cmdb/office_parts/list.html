@@ -750,6 +750,9 @@ function previewImages(input, previewId) {
     input.value = '';
 }
 
+// 记录最后点击的复选框索引
+var lastCheckedIndex = -1;
+
 // 全选/取消全选
 function toggleSelectAll() {
     var selectAll = document.getElementById('selectAll');
@@ -774,11 +777,34 @@ function updateBatchDeleteButton() {
     }
 }
 
+// 处理复选框点击（支持 Shift 多选）
+function handleCheckboxClick(event) {
+    var checkboxes = Array.from(document.querySelectorAll('.part-checkbox'));
+    var currentIndex = checkboxes.indexOf(event.target);
+    
+    // 如果按住 Shift 键且之前有选中过
+    if (event.shiftKey && lastCheckedIndex !== -1 && lastCheckedIndex !== currentIndex) {
+        // 确定选择范围
+        var start = Math.min(lastCheckedIndex, currentIndex);
+        var end = Math.max(lastCheckedIndex, currentIndex);
+        
+        // 选中范围内的所有复选框
+        for (var i = start; i <= end; i++) {
+            checkboxes[i].checked = event.target.checked;
+        }
+    }
+    
+    // 更新最后点击的索引
+    lastCheckedIndex = currentIndex;
+    
+    updateBatchDeleteButton();
+}
+
 // 监听单个复选框变化
 document.addEventListener('DOMContentLoaded', function() {
     var checkboxes = document.querySelectorAll('.part-checkbox');
     checkboxes.forEach(function(checkbox) {
-        checkbox.addEventListener('change', updateBatchDeleteButton);
+        checkbox.addEventListener('click', handleCheckboxClick);
     });
 });
 
