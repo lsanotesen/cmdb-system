@@ -5034,7 +5034,9 @@ def api_install_sparepart(request):
                         'ip': '0.0.0.0',
                         'memo': sparepart.name,  # 设置显示名称为备件名称
                         'asset_no': sparepart.asset_code,  # 备件资产编号
-                        'images': sparepart.images  # 备件图片
+                        'images': sparepart.images,  # 备件图片
+                        'brand': sparepart.brand,  # 备件品牌
+                        'disk': sparepart.size  # 备件大小（存储到disk字段）
                     }
                 )
 
@@ -5083,7 +5085,7 @@ def api_install_sparepart(request):
 
 @login_required
 def api_return_sparepart(request):
-    """将备件退库（不创建任何关联记录）"""
+    """将备件退库（创建已退库设备记录）"""
     if request.method == 'POST':
         try:
             data = request.POST
@@ -5093,10 +5095,30 @@ def api_return_sparepart(request):
             with transaction.atomic():
                 sparepart = SparePart.objects.select_for_update().get(id=sparepart_id)
                 
+                # 创建已退库设备记录
+                relation = AssetRelation.objects.create(
+                    parent_asset=None,
+                    child_asset=None,
+                    parent_asset_no=sparepart.asset_code or '',
+                    parent_asset_name='',
+                    child_asset_no=sparepart.asset_code or '',
+                    child_asset_name=sparepart.name or '',
+                    child_asset_model=sparepart.model or '',
+                    child_asset_sn=sparepart.serial_number or '',
+                    child_asset_images=sparepart.images or '',
+                    slot=sparepart.location or '',
+                    is_returned=True,
+                    returned_at=timezone.now()
+                )
+                
+                # 如果模型有扩展字段用于存储品牌和大小，保存这些信息
+                # 注：当前AssetRelation模型没有专门的品牌和大小字段，品牌信息存储在child_asset_model中
+                # 大小信息存储在slot字段中（用于备件退库）
+                
                 # 记录操作日志
                 log_operation(request.user, 'update', f'备件退库: {sparepart.name}', '备件退库操作', request.META.get('REMOTE_ADDR'))
                 
-                # 直接删除备件记录，不创建任何关联记录
+                # 删除备件记录
                 sparepart.delete()
 
                 return JsonResponse({'success': True, 'message': '备件退库成功'})
@@ -5463,6 +5485,7 @@ def api_add_to_spareparts(request):
                 device_model = relation.child_asset_model or (child_asset.device_model if child_asset else '')
                 serial_number = relation.child_asset_sn or (child_asset.sn if child_asset else '')
                 images = relation.child_asset_images or (child_asset.images if child_asset else '')
+                brand_info = child_asset.brand if child_asset else ''
                 
                 # 如果没有任何资产信息，报错
                 if not asset_no and not asset_name:
@@ -5488,7 +5511,7 @@ def api_add_to_spareparts(request):
                 sparepart = SparePart.objects.create(
                     asset_code=asset_no,
                     name=asset_name,
-                    brand=child_asset.brand if child_asset else '',
+                    brand=brand_info,
                     model=device_model,
                     serial_number=serial_number,
                     size=size_info,
