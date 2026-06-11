@@ -187,9 +187,6 @@
 </div>
 
 <script>
-// 记录最后点击的复选框（用于 Shift 多选）
-var lastCheckedHostCheckbox = null;
-
 // 删除确认
 function confirmDelete(url, hostname) {
     if (confirm('确定删除资产 ' + hostname + '?')) {
@@ -204,38 +201,6 @@ function selectAll() {
     hostCheckboxes.forEach(checkbox => {
         checkbox.checked = selectAllCheckbox.checked;
     });
-    // 重置最后点击记录
-    lastCheckedHostCheckbox = null;
-}
-
-// 处理复选框点击（支持 Shift 多选）
-function handleHostCheckboxClick(event) {
-    // 使用closest找到复选框（处理点击复选框标签的情况）
-    const checkbox = event.target.closest('input[type="checkbox"].host-checkbox');
-    
-    if (!checkbox) {
-        return;
-    }
-    
-    const checkboxes = Array.from(document.querySelectorAll('.host-checkbox'));
-    const currentIndex = checkboxes.indexOf(checkbox);
-    
-    // 如果按住 Shift 键且之前有选中过
-    if (event.shiftKey && lastCheckedHostCheckbox !== null && lastCheckedHostCheckbox !== checkbox) {
-        const lastIndex = checkboxes.indexOf(lastCheckedHostCheckbox);
-        
-        // 确定选择范围
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-        
-        // 选中范围内的所有复选框
-        for (let i = start; i <= end; i++) {
-            checkboxes[i].checked = checkbox.checked;
-        }
-    }
-    
-    // 更新最后点击的复选框
-    lastCheckedHostCheckbox = checkbox;
 }
 
 // 批量删除
@@ -276,14 +241,57 @@ function batchDelete() {
     });
 }
 
-// 页面加载完成后绑定事件（使用事件委托）
-document.addEventListener('DOMContentLoaded', function() {
-    // 使用事件委托，监听表格容器上的点击事件
-    const tableContainer = document.querySelector('.table-container');
-    if (tableContainer) {
-        tableContainer.addEventListener('click', handleHostCheckboxClick);
-        tableContainer.addEventListener('mousedown', handleHostCheckboxClick);
+// Shift 多选功能 - 使用闭包封装
+(function() {
+    var lastChecked = null;
+    
+    // 处理单个复选框点击
+    function onCheckboxClick(e) {
+        var checkbox = e.target;
+        if (!checkbox || checkbox.type !== 'checkbox') {
+            return;
+        }
+        
+        // 检查是否按住 Shift 键
+        if (e.shiftKey && lastChecked && lastChecked !== checkbox) {
+            // 获取所有复选框
+            var checkboxes = document.querySelectorAll('.host-checkbox');
+            var checkboxesArray = Array.prototype.slice.call(checkboxes);
+            
+            // 找到当前和上次点击的复选框索引
+            var currentIndex = checkboxesArray.indexOf(checkbox);
+            var lastIndex = checkboxesArray.indexOf(lastChecked);
+            
+            // 确定选择范围
+            var start = Math.min(currentIndex, lastIndex);
+            var end = Math.max(currentIndex, lastIndex);
+            
+            // 选中/取消选中范围内的所有复选框
+            for (var i = start; i <= end; i++) {
+                checkboxesArray[i].checked = checkbox.checked;
+            }
+        }
+        
+        // 更新最后点击的复选框
+        lastChecked = checkbox;
     }
-});
+    
+    // 页面加载完成后绑定事件
+    document.addEventListener('DOMContentLoaded', function() {
+        // 为每个复选框绑定点击事件
+        var checkboxes = document.querySelectorAll('.host-checkbox');
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener('click', onCheckboxClick);
+        });
+        
+        // 监听全选框，重置最后点击记录
+        var selectAll = document.getElementById('select-all');
+        if (selectAll) {
+            selectAll.addEventListener('click', function() {
+                lastChecked = null;
+            });
+        }
+    });
+})();
 </script>
 {% endblock %}
