@@ -44,13 +44,13 @@
                 <tr>
                     <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
                     <td>{{ relation.child_asset.asset_no|default:"-" }}</td>
-                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname }}</td>
+                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname|default:"-" }}</td>
                     <td>{{ relation.child_asset.device_model|default:"-" }}</td>
                     <td>{{ relation.child_asset.sn|default:"-" }}</td>
                     <td>{{ relation.slot|default:"-" }}</td>
                     <td>{{ relation.returned_at|date:"Y-m-d H:i:s" }}</td>
                     <td>
-                        {% if relation.child_asset.images %}
+                        {% if relation.child_asset and relation.child_asset.images %}
                             {% for img in relation.child_asset.get_images_list %}
                                 <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
                             {% endfor %}
