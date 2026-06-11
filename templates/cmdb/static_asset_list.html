@@ -163,6 +163,59 @@ function selectAll() {
     });
 }
 
+// Shift 多选功能 - 使用闭包封装
+(function() {
+    var lastChecked = null;
+    
+    // 处理单个复选框点击
+    function onCheckboxClick(e) {
+        var checkbox = e.target;
+        if (!checkbox || checkbox.type !== 'checkbox') {
+            return;
+        }
+        
+        // 检查是否按住 Shift 键
+        if (e.shiftKey && lastChecked && lastChecked !== checkbox) {
+            // 获取所有复选框
+            var checkboxes = document.querySelectorAll('.asset-checkbox');
+            var checkboxesArray = Array.prototype.slice.call(checkboxes);
+            
+            // 找到当前和上次点击的复选框索引
+            var currentIndex = checkboxesArray.indexOf(checkbox);
+            var lastIndex = checkboxesArray.indexOf(lastChecked);
+            
+            // 确定选择范围
+            var start = Math.min(currentIndex, lastIndex);
+            var end = Math.max(currentIndex, lastIndex);
+            
+            // 选中/取消选中范围内的所有复选框
+            for (var i = start; i <= end; i++) {
+                checkboxesArray[i].checked = checkbox.checked;
+            }
+        }
+        
+        // 更新最后点击的复选框
+        lastChecked = checkbox;
+    }
+    
+    // 页面加载完成后绑定事件
+    document.addEventListener('DOMContentLoaded', function() {
+        // 为每个复选框绑定点击事件
+        var checkboxes = document.querySelectorAll('.asset-checkbox');
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener('click', onCheckboxClick);
+        });
+        
+        // 监听全选框，重置最后点击记录
+        var selectAll = document.getElementById('select-all');
+        if (selectAll) {
+            selectAll.addEventListener('click', function() {
+                lastChecked = null;
+            });
+        }
+    });
+})();
+
 // 批量删除
 function batchDelete() {
     const selectedCheckboxes = document.querySelectorAll('.asset-checkbox:checked');
