@@ -5457,10 +5457,21 @@ def api_add_to_spareparts(request):
                 if relation.is_returned:
                     return JsonResponse({'success': False, 'error': '该设备已经添加到备件库，请勿重复添加'})
                 
+                # 优先使用冗余字段，其次使用关联资产
+                asset_no = relation.child_asset_no or (child_asset.asset_no if child_asset else '')
+                asset_name = relation.child_asset_name or (child_asset.memo if child_asset else '') or (child_asset.hostname if child_asset else '')
+                device_model = relation.child_asset_model or (child_asset.device_model if child_asset else '')
+                serial_number = relation.child_asset_sn or (child_asset.sn if child_asset else '')
+                images = relation.child_asset_images or (child_asset.images if child_asset else '')
+                
+                # 如果没有任何资产信息，报错
+                if not asset_no and not asset_name:
+                    return JsonResponse({'success': False, 'error': '无法获取资产信息，请检查数据完整性'})
+                
                 # 创建备件记录
                 # 尝试从disk字段提取大小信息（格式如 "300GB"）
                 size_info = ''
-                if child_asset.disk:
+                if child_asset and child_asset.disk:
                     # 尝试提取数字+单位的模式
                     import re
                     match = re.search(r'(\d+)\s*([GTM]B)', child_asset.disk, re.IGNORECASE)
@@ -5469,21 +5480,21 @@ def api_add_to_spareparts(request):
                 
                 # 尝试恢复备件类型
                 sparepart_type = None
-                if child_asset.asset_type:
+                if child_asset and child_asset.asset_type:
                     # 尝试查找现有的备件类型（使用first处理可能存在多个同名类型的情况）
                     from cmdb.models import SparePartType
                     sparepart_type = SparePartType.objects.filter(name=child_asset.asset_type).first()
                 
                 sparepart = SparePart.objects.create(
-                    asset_code=child_asset.asset_no or '',
-                    name=child_asset.memo or child_asset.hostname,
-                    brand=child_asset.brand or '',
-                    model=child_asset.device_model or '',
-                    serial_number=child_asset.sn or '',
+                    asset_code=asset_no,
+                    name=asset_name,
+                    brand=child_asset.brand if child_asset else '',
+                    model=device_model,
+                    serial_number=serial_number,
                     size=size_info,
                     status=mapped_status,
                     location=relation.slot or '',
-                    images=child_asset.images or '',
+                    images=images,
                     type=sparepart_type,  # 关联备件类型
                     is_installed=False,
                     installed_host_id=None,
@@ -5541,14 +5552,19 @@ def returned_devices_list(request):
     returned_relations = AssetRelation.objects.filter(is_returned=True)\
         .select_related('parent_asset', 'child_asset')
     
-    # 如果有搜索条件，进行过滤
+    # 如果有搜索条件，进行过滤（同时搜索冗余字段和关联字段）
     if search_query:
         returned_relations = returned_relations.filter(
+            Q(parent_asset_no__icontains=search_query) |
             Q(parent_asset__asset_no__icontains=search_query) |
+            Q(child_asset_no__icontains=search_query) |
             Q(child_asset__asset_no__icontains=search_query) |
+            Q(child_asset_name__icontains=search_query) |
             Q(child_asset__hostname__icontains=search_query) |
             Q(child_asset__memo__icontains=search_query) |
+            Q(child_asset_model__icontains=search_query) |
             Q(child_asset__device_model__icontains=search_query) |
+            Q(child_asset_sn__icontains=search_query) |
             Q(child_asset__sn__icontains=search_query)
         )
     
@@ -5596,14 +5612,15 @@ def api_batch_return_to_warehouse(request):
                     
                     relation.save()
                     
-                    # 添加生命周期事件
-                    LifecycleEvent.objects.create(
-                        asset=relation.child_asset,
-                        event_type='maintenance',
-                        event_time=timezone.now(),
-                        operator=request.user,
-                        remark=f'已退库'
-                    )
+                    # 添加生命周期事件（只有子资产存在时）
+                    if relation.child_asset:
+                        LifecycleEvent.objects.create(
+                            asset=relation.child_asset,
+                            event_type='maintenance',
+                            event_time=timezone.now(),
+                            operator=request.user,
+                            remark=f'已退库'
+                        )
                 
                 log_operation(request.user, 'update', f'批量退库 {len(relation_ids)} 个设备', '批量退库操作', request.META.get('REMOTE_ADDR'))
             
@@ -5629,6 +5646,10 @@ def api_cancel_return(request):
                 # 检查是否已退库
                 if not relation.is_returned:
                     return JsonResponse({'success': False, 'error': '设备尚未退库'})
+                
+                # 检查子资产是否存在（如果已删除则不允许取消退库）
+                if not relation.child_asset:
+                    return JsonResponse({'success': False, 'error': '关联的子资产已被删除，无法取消退库。如果需要重新入库，请使用冗余字段中的信息手动创建新资产。'})
                 
                 # 取消退库
                 relation.is_returned = False
