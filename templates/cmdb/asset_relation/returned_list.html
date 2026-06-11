@@ -43,10 +43,10 @@
                 {% for relation in relations %}
                 <tr>
                     <td>{{ relation.parent_asset.asset_no|default:"-" }}</td>
-                    <td>{{ relation.child_asset.asset_no|default:"-" }}</td>
-                    <td>{{ relation.child_asset.memo|default:relation.child_asset.hostname|default:"-" }}</td>
-                    <td>{{ relation.child_asset.device_model|default:"-" }}</td>
-                    <td>{{ relation.child_asset.sn|default:"-" }}</td>
+                    <td>{% if relation.child_asset %}{{ relation.child_asset.asset_no|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset %}{{ relation.child_asset.memo|default:relation.child_asset.hostname|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset %}{{ relation.child_asset.device_model|default:"-" }}{% else %}-{% endif %}</td>
+                    <td>{% if relation.child_asset %}{{ relation.child_asset.sn|default:"-" }}{% else %}-{% endif %}</td>
                     <td>{{ relation.slot|default:"-" }}</td>
                     <td>{{ relation.returned_at|date:"Y-m-d H:i:s" }}</td>
                     <td>

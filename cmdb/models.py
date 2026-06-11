@@ -595,7 +595,7 @@ class InstallHistory(models.Model):
     ]
     asset_relation = models.ForeignKey('AssetRelation', verbose_name='资产关系', on_delete=models.CASCADE, related_name='install_histories', null=True, blank=True)
     parent_asset = models.ForeignKey('Host', verbose_name='主资产', on_delete=models.CASCADE, related_name='install_histories_as_parent', null=True, blank=True)
-    child_asset = models.ForeignKey('Host', verbose_name='子资产', on_delete=models.CASCADE, related_name='install_histories_as_child', null=True, blank=True)
+    child_asset = models.ForeignKey('Host', verbose_name='子资产', on_delete=models.SET_NULL, related_name='install_histories_as_child', null=True, blank=True)
     install_time = models.DateTimeField('安装时间')
     uninstall_time = models.DateTimeField('拆卸时间', blank=True, null=True)
     operator = models.ForeignKey(User, verbose_name='操作人', on_delete=models.SET_NULL, null=True, blank=True)
