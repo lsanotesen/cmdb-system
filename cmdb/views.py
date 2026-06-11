@@ -397,17 +397,6 @@ def asset_delete(request, asset_id):
     try:
         asset = get_object_or_404(Host, id=asset_id)
         asset_name = asset.hostname
-        
-        # 检查是否有已退库的资产关系
-        returned_relation = AssetRelation.objects.filter(
-            child_asset=asset,
-            is_returned=True
-        ).first()
-        
-        if returned_relation:
-            messages.error(request, f'无法删除资产 {asset_name}，该资产已退库。请先在"已退库设备"页面处理退库记录。')
-            return redirect('asset_list')
-        
         asset.delete()
 
         log_operation(request.user, 'delete', f'动态资产: {asset_name}', f'删除动态资产: {asset_name}', request.META.get('REMOTE_ADDR'))
@@ -577,18 +566,6 @@ def asset_batch_delete(request):
 
             if not asset_ids:
                 return JsonResponse({'success': False, 'message': '请选择要删除的资产'})
-
-            # 检查是否有已退库的资产关系
-            returned_count = AssetRelation.objects.filter(
-                child_asset_id__in=asset_ids,
-                is_returned=True
-            ).count()
-
-            if returned_count > 0:
-                return JsonResponse({
-                    'success': False, 
-                    'message': f'选中的资产中有 {returned_count} 个已退库设备，无法删除。请先在"已退库设备"页面处理退库记录。'
-                })
 
             # 删除选定的资产
             deleted_count = Host.objects.filter(id__in=asset_ids).delete()[0]
@@ -5106,7 +5083,7 @@ def api_install_sparepart(request):
 
 @login_required
 def api_return_sparepart(request):
-    """将备件退库（不创建动态资产）"""
+    """将备件退库（不创建任何关联记录）"""
     if request.method == 'POST':
         try:
             data = request.POST
@@ -5119,31 +5096,7 @@ def api_return_sparepart(request):
                 # 记录操作日志
                 log_operation(request.user, 'update', f'备件退库: {sparepart.name}', '备件退库操作', request.META.get('REMOTE_ADDR'))
                 
-                # 如果备件已安装到某台服务器，查找并标记对应的资产关系为已退库
-                if sparepart.is_installed and sparepart.installed_host_id:
-                    # 查找对应的资产关系记录
-                    relation = AssetRelation.objects.filter(
-                        child_asset__asset_code=sparepart.asset_code,
-                        is_returned=False
-                    ).first()
-                    
-                    if relation:
-                        # 标记为已退库
-                        relation.is_returned = True
-                        relation.returned_at = timezone.now()
-                        relation.remark = f'备件退库: {return_reason}'
-                        relation.save()
-                        
-                        # 添加生命周期事件
-                        LifecycleEvent.objects.create(
-                            asset=relation.child_asset,
-                            event_type='maintenance',
-                            event_time=timezone.now(),
-                            operator=request.user,
-                            remark=f'备件退库: {return_reason}'
-                        )
-                
-                # 删除备件记录
+                # 直接删除备件记录，不创建任何关联记录
                 sparepart.delete()
 
                 return JsonResponse({'success': True, 'message': '备件退库成功'})
