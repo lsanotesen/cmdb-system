@@ -5504,6 +5504,7 @@ def api_add_to_spareparts(request):
                     relation.child_asset_name = relation.child_asset.memo or relation.child_asset.hostname or ''
                     relation.child_asset_model = relation.child_asset.device_model or ''
                     relation.child_asset_sn = relation.child_asset.sn or ''
+                    relation.child_asset_images = relation.child_asset.images or ''
                 
                 relation.save()
                 
@@ -5591,6 +5592,7 @@ def api_batch_return_to_warehouse(request):
                         relation.child_asset_name = relation.child_asset.memo or relation.child_asset.hostname or ''
                         relation.child_asset_model = relation.child_asset.device_model or ''
                         relation.child_asset_sn = relation.child_asset.sn or ''
+                        relation.child_asset_images = relation.child_asset.images or ''
                     
                     relation.save()
                     

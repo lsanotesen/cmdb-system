@@ -50,13 +50,15 @@
                     <td>{{ relation.slot|default:"-" }}</td>
                     <td>{{ relation.returned_at|date:"Y-m-d H:i:s" }}</td>
                     <td>
-                        {% if relation.child_asset and relation.child_asset.images %}
-                            {% for img in relation.child_asset.get_images_list %}
-                                <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
-                            {% endfor %}
-                        {% else %}
-                            <span style="color: #999;">-</span>
-                        {% endif %}
+                        {% with images=relation.get_child_images_list %}
+                            {% if images %}
+                                {% for img in images %}
+                                    <img src="{{ img }}" width="50" height="50" style="object-fit: cover; border-radius: 4px; cursor: pointer;" onclick="openImagePreview('{{ img }}')" title="点击查看大图">
+                                {% endfor %}
+                            {% else %}
+                                <span style="color: #999;">-</span>
+                            {% endif %}
+                        {% endwith %}
                     </td>
                     <td>
                         <button type="button" class="btn btn-sm btn-warning" onclick="cancelReturn({{ relation.id }})">取消退库</button>

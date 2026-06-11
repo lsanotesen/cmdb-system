@@ -570,6 +570,7 @@ class AssetRelation(models.Model):
     child_asset_name = models.CharField('子资产名称', max_length=200, blank=True)
     child_asset_model = models.CharField('子资产型号', max_length=100, blank=True)
     child_asset_sn = models.CharField('子资产序列号', max_length=100, blank=True)
+    child_asset_images = models.TextField('子资产图片（JSON格式）', blank=True)
     
     slot = models.CharField('槽位', max_length=100, blank=True, help_text='如 PCIe Slot 1, DIMM A1, Disk Bay 2')
     is_removable = models.BooleanField('是否可拆卸', default=True)
@@ -581,6 +582,24 @@ class AssetRelation(models.Model):
 
     def __str__(self):
         return f'{self.parent_asset} -> {self.child_asset} ({self.slot})'
+    
+    def get_child_images_list(self):
+        """获取子资产图片路径列表（优先从冗余字段读取）"""
+        # 优先使用冗余字段
+        if self.child_asset_images:
+            try:
+                import json
+                return json.loads(self.child_asset_images)
+            except:
+                pass
+        # 如果关联的子资产存在，使用子资产的图片
+        if self.child_asset and self.child_asset.images:
+            try:
+                import json
+                return json.loads(self.child_asset.images)
+            except:
+                pass
+        return []
 
     class Meta:
         verbose_name = '资产关系'
